@@ -54,6 +54,7 @@ namespace WebApiO
             app.UseHttpsRedirection();
             app.UseMvc(routes =>
             {
+                // Set routing to root
                 routes.MapRoute("default", "");
             });
 
@@ -61,6 +62,7 @@ namespace WebApiO
 
         private static async Task<IClusterClient> StartClientWithRetries()
         {
+            // Client config
             IClusterClient client;
             client = new ClientBuilder()
                 .UseLocalhostClustering()
@@ -79,12 +81,11 @@ namespace WebApiO
         private static async Task<bool> RetryFilter(Exception exception)
         {
             attempt++;
-            Debug.WriteLine($"Cluster client attempt {attempt} of {initializeAttemptsBeforeFailing} failed to connect to cluster.  Exception: {exception}");
             if (attempt > initializeAttemptsBeforeFailing)
             {
                 return false;
             }
-            await Task.Delay(TimeSpan.FromSeconds(3));
+            await Task.Delay(TimeSpan.FromSeconds(2));
             return true;
         }
     }

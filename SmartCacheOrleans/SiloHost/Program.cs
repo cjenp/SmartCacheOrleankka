@@ -21,7 +21,7 @@ namespace SiloHost
             {
                 var host = await StartSilo();
 
-                Console.WriteLine("Silo started");
+                Console.WriteLine("Silo started, press Enter to stop.");
                 Console.ReadLine();
 
                 await host.StopAsync();

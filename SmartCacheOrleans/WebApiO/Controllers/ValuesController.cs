@@ -10,6 +10,7 @@ namespace WebApiO.Controllers
     [ApiController]
     public class ValuesController : ControllerBase
     {
+        //GET: www.example.com/
         [Route("")]
         [HttpGet]
         public string Get()
@@ -17,6 +18,7 @@ namespace WebApiO.Controllers
             return "WebApi is running. Use GET or POST.";
         }
 
+        //GET: www.example.com/{id}
         [Route("{id}")]
         [HttpGet]
         public async Task<string> Get(string id)
@@ -33,6 +35,7 @@ namespace WebApiO.Controllers
                 return "Not found";
         }
 
+        //POST: www.example.com/{id}
         [Route("{id}")]
         [HttpPost]
         public async Task<string> Post(string id)

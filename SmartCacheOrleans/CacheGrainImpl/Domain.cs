@@ -1,6 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Threading.Tasks;
 using CacheGrainInter;
 using Orleans;
@@ -13,12 +12,21 @@ namespace CacheGrainImpl
     {
         bool stateChanged = false;
 
+        /// <summary>
+        /// Executes on grain activation and starts a timer for saving to storage
+        /// </summary>
+        /// <returns></returns>
         public override Task OnActivateAsync()
         {
             RegisterTimer(WriteState, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
             return base.OnActivateAsync();
         }
 
+        /// <summary>
+        /// Saves grain state to blob storage
+        /// </summary>
+        /// <param name="_"></param>
+        /// <returns></returns>
         private async Task WriteState(object _)
         {
             if (!stateChanged)
@@ -35,6 +43,11 @@ namespace CacheGrainImpl
             }
         }
 
+        /// <summary>
+        /// Adds email
+        /// </summary>
+        /// <param name="email">Email address</param>
+        /// <returns>True if email was added, false if the email allready exists</returns>
         public Task<bool> AddEmail(string email)
         {
             if (State == null)
@@ -48,9 +61,17 @@ namespace CacheGrainImpl
             return Task.FromResult(true);
         }
 
+        /// <summary>
+        /// Check if email exists
+        /// </summary>
+        /// <param name="email">Email address</param>
+        /// <returns>True if email is found, false otherwise</returns>
         public Task<bool> Exists(string email)
         {
-            return Task.FromResult(State.Contains(email));
+            if (State == null)
+                return Task.FromResult(false);
+            else
+                return Task.FromResult(State.Contains(email));
         }
     }
 }
