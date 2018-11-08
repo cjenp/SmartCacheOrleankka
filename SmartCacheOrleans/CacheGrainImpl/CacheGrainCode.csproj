@@ -10,7 +10,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CacheGrainInter\CacheGrainInter.csproj" />
+    <ProjectReference Include="..\CacheGrainInter\CacheGrainInterface.csproj" />
   </ItemGroup>
 
 </Project>

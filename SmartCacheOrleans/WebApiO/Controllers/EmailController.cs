@@ -8,12 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 namespace WebApiO.Controllers
 {
     [ApiController]
-    public class ValuesController : ControllerBase
+    public class EmailController : ControllerBase
     {
         //GET: www.example.com/
         [Route("")]
         [HttpGet]
-        public string Get()
+        public string Info()
         {
             return "WebApi is running. Use GET or POST.";
         }
@@ -21,7 +21,7 @@ namespace WebApiO.Controllers
         //GET: www.example.com/{id}
         [Route("{id}")]
         [HttpGet]
-        public async Task<string> Get(string id)
+        public async Task<string> ExistsEmail(string id)
         {
             if (id.IndexOf('@') == -1)
                 return "Inncorrect email!";
