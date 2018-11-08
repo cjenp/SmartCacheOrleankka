@@ -23,6 +23,16 @@ namespace CacheGrainImpl
         }
 
         /// <summary>
+        /// Saves grain state before grain deactivates
+        /// </summary>
+        /// <returns></returns>
+        public override Task OnDeactivateAsync()
+        {
+            WriteState(null).GetAwaiter().GetResult();
+            return base.OnDeactivateAsync();
+        }
+
+        /// <summary>
         /// Saves grain state to blob storage
         /// </summary>
         /// <param name="_"></param>
