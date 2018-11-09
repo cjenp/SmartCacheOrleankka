@@ -25,14 +25,14 @@ namespace WebApiO.Controllers
             return "WebApi is running. Use GET or POST.";
         }
 
-        //GET: www.example.com/{id}
-        [Route("{id}")]
+        //GET: www.example.com/{email}
+        [Route("{email}")]
         [HttpGet]
-        public async Task<IActionResult> ExistsEmail(string id)
+        public async Task<IActionResult> ExistsEmail(string email)
         {
             try
             {
-                var response = await emailChechker.EmailExists(id);
+                var response = await emailChechker.EmailExists(email);
                 if (response)
                     return Ok();
                 else
@@ -44,16 +44,16 @@ namespace WebApiO.Controllers
             }
         }
 
-        //POST: www.example.com/{id}
-        [Route("{id}")]
+        //POST: www.example.com/{email}
+        [Route("{email}")]
         [HttpPost]
-        public async Task<IActionResult> Post(string id)
+        public async Task<IActionResult> Post(string email)
         {
             try
             {
-                var response = await emailChechker.AddEmail(id);
+                var response = await emailChechker.AddEmail(email);
                 if (response)
-                    return Created("", id);
+                    return Created("", email);
                 else
                     return Conflict();
             }
