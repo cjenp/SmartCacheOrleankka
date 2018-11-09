@@ -1,4 +1,5 @@
-﻿using System.Threading.Tasks;
+﻿using System.Net;
+using System.Threading.Tasks;
 using CacheGrainInter;
 using Microsoft.AspNetCore.Mvc;
 using ServiceInterface;
@@ -25,25 +26,25 @@ namespace WebApiO.Controllers
         //GET: www.example.com/{id}
         [Route("{id}")]
         [HttpGet]
-        public async Task<string> ExistsEmail(string id)
+        public async Task<IActionResult> ExistsEmail(string id)
         {
             var response=await emailChechker.EmailExists(id);
             if (response)
-                return "OK";
+                return Ok();
             else
-                return "Not found";
+                return NotFound();
         }
 
         //POST: www.example.com/{id}
         [Route("{id}")]
         [HttpPost]
-        public async Task<string> Post(string id)
+        public async Task<IActionResult> Post(string id)
         {
             var response = await emailChechker.AddEmail(id);
             if (response)
-                return "Created";
+                return Created("", id);
             else
-                return "Conflict";
+                return Conflict();
         }
     }
 }
