@@ -8,7 +8,7 @@ using Orleans.Providers;
 namespace CacheGrainImpl
 {
     [StorageProvider(ProviderName = "blobStore")]
-    public class Domain : Grain<List<string>>, IDomain
+    public class Domain : Grain<HashSet<string>>, IDomain
     {
         bool stateChanged = false;
 
@@ -61,14 +61,10 @@ namespace CacheGrainImpl
         public Task<bool> AddEmail(string email)
         {
             if (State == null)
-                State = new List<string>();
+                State = new HashSet<string>();
 
-            if (State.Contains(email))
-                return Task.FromResult(false);
-
-            State.Add(email);
-            stateChanged = true;
-            return Task.FromResult(true);
+            stateChanged = State.Add(email);
+            return Task.FromResult(stateChanged);
         }
 
         /// <summary>
