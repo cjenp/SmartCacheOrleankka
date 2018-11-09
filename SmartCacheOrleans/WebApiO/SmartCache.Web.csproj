@@ -11,9 +11,9 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CacheGrainInter\CacheGrainInterface.csproj" />
-    <ProjectReference Include="..\ServiceCode\ServiceCode.csproj" />
-    <ProjectReference Include="..\ServiceInterface\ServiceInterface.csproj" />
+    <ProjectReference Include="..\CacheGrainInter\SmartCache.GrainInterface.csproj" />
+    <ProjectReference Include="..\ServiceCode\SmartCache.ServiceCode.csproj" />
+    <ProjectReference Include="..\ServiceInterface\SmartCache.ServiceInterface.csproj" />
   </ItemGroup>
 
 </Project>

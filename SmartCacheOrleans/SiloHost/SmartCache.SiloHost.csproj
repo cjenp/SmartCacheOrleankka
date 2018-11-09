@@ -13,7 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\CacheGrainImpl\CacheGrainCode.csproj" />
+    <ProjectReference Include="..\CacheGrainImpl\SmartCache.GrainCode.csproj" />
   </ItemGroup>
 
 </Project>

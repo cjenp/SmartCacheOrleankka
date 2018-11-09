@@ -3,17 +3,17 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 15
 VisualStudioVersion = 15.0.26730.16
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SiloHost", "SiloHost\SiloHost.csproj", "{1B186139-A229-438F-853E-0C68BF276FCC}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.SiloHost", "SiloHost\SmartCache.SiloHost.csproj", "{1B186139-A229-438F-853E-0C68BF276FCC}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CacheGrainCode", "CacheGrainImpl\CacheGrainCode.csproj", "{DC6916DD-900C-43BB-85B9-D689709021E5}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.GrainCode", "CacheGrainImpl\SmartCache.GrainCode.csproj", "{DC6916DD-900C-43BB-85B9-D689709021E5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "CacheGrainInterface", "CacheGrainInter\CacheGrainInterface.csproj", "{B9021B85-7537-4901-B85A-63CD5D090614}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.GrainInterface", "CacheGrainInter\SmartCache.GrainInterface.csproj", "{B9021B85-7537-4901-B85A-63CD5D090614}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCacheWeb", "WebApiO\SmartCacheWeb.csproj", "{42455CE8-382C-49C9-A201-7B1087F2190F}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.Web", "WebApiO\SmartCache.Web.csproj", "{42455CE8-382C-49C9-A201-7B1087F2190F}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceInterface", "ServiceInterface\ServiceInterface.csproj", "{F8E0D9E3-2CC6-492B-B901-CFCD9732FE7B}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.ServiceInterface", "ServiceInterface\SmartCache.ServiceInterface.csproj", "{F8E0D9E3-2CC6-492B-B901-CFCD9732FE7B}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ServiceCode", "ServiceCode\ServiceCode.csproj", "{2A6FADF5-F95C-41AA-9D30-50DE8F68A184}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.ServiceCode", "ServiceCode\SmartCache.ServiceCode.csproj", "{2A6FADF5-F95C-41AA-9D30-50DE8F68A184}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

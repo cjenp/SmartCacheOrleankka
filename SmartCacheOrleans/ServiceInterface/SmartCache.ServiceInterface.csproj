@@ -5,7 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ServiceInterface\ServiceInterface.csproj" />
+    <ProjectReference Include="..\CacheGrainInter\SmartCache.GrainInterface.csproj" />
   </ItemGroup>
 
 </Project>
