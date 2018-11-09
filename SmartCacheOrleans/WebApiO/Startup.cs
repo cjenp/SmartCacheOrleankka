@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.Linq;
 using System.Threading.Tasks;
 using CacheGrainInter;
 using Microsoft.AspNetCore.Builder;
@@ -16,6 +13,8 @@ using Microsoft.Extensions.Options;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using ServiceCode;
+using ServiceInterface;
 
 namespace WebApiO
 {
@@ -23,12 +22,10 @@ namespace WebApiO
     {
         const int initializeAttemptsBeforeFailing = 10;
         private static int attempt = 0;
-        public static IClusterClient orleansClient;
 
         public Startup(IConfiguration configuration)
         {
-            Configuration = configuration;
-            orleansClient = StartClientWithRetries().GetAwaiter().GetResult();
+            Configuration = configuration; 
         }
 
         public IConfiguration Configuration { get; }
@@ -36,6 +33,11 @@ namespace WebApiO
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
+            IClusterClient orleansClient = StartClientWithRetries().GetAwaiter().GetResult();
+            services.AddSingleton<IEmailCheck, EmailCheck>(serviceProvider =>
+            {
+                return new EmailCheck(orleansClient);
+            });
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
         }
 

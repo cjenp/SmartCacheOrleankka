@@ -12,6 +12,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\CacheGrainInter\CacheGrainInterface.csproj" />
+    <ProjectReference Include="..\ServiceCode\ServiceCode.csproj" />
+    <ProjectReference Include="..\ServiceInterface\ServiceInterface.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,15 +1,19 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.Threading.Tasks;
 using CacheGrainInter;
 using Microsoft.AspNetCore.Mvc;
+using ServiceInterface;
 
 namespace WebApiO.Controllers
 {
     [ApiController]
     public class EmailController : ControllerBase
     {
+        private IEmailCheck emailChechker;
+        public EmailController(IEmailCheck _emailChechker)
+        {
+            emailChechker = _emailChechker;
+        }
+
         //GET: www.example.com/
         [Route("")]
         [HttpGet]
@@ -23,12 +27,7 @@ namespace WebApiO.Controllers
         [HttpGet]
         public async Task<string> ExistsEmail(string id)
         {
-            if (id.IndexOf('@') == -1)
-                return "Inncorrect email!";
-
-            string domain = id.Substring(id.IndexOf('@'));
-            var grain = Startup.orleansClient.GetGrain<IDomain>(domain);
-            var response = await grain.Exists(id);
+            var response=await emailChechker.EmailExists(id);
             if (response)
                 return "OK";
             else
@@ -40,14 +39,8 @@ namespace WebApiO.Controllers
         [HttpPost]
         public async Task<string> Post(string id)
         {
-            if (id.IndexOf('@') == -1)
-                return "Incorrect email!";
-
-            string domain = id.Substring(id.IndexOf('@'));
-            var grain = Startup.orleansClient.GetGrain<IDomain>(domain);
-            bool isOK = await grain.AddEmail(id);
-
-            if (isOK)
+            var response = await emailChechker.AddEmail(id);
+            if (response)
                 return "Created";
             else
                 return "Conflict";
