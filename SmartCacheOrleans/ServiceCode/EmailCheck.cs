@@ -3,6 +3,7 @@ using System;
 using System.Threading.Tasks;
 using Orleans;
 using CacheGrainInter;
+using System.Net.Mail;
 
 namespace ServiceCode
 {
@@ -17,22 +18,38 @@ namespace ServiceCode
 
         public async Task<bool> AddEmail(string email)
         {
-            if (email.IndexOf('@') == -1)
-                throw new Exception("Invalid email");
-
-            string domain = email.Substring(email.IndexOf('@'));
-            var grain = client.GetGrain<IDomain>(domain);
-            return await grain.AddEmail(email);
+            try
+            {
+                MailAddress emailAddress = new MailAddress(email);
+                var grain = client.GetGrain<IDomain>(emailAddress.Host);
+                return await grain.AddEmail(email);
+            }
+            catch (FormatException)
+            {
+                throw new FormatException(String.Format("Invalid email format: '{0}'.",email));
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
         }
 
         public async Task<bool> EmailExists(string email)
         {
-            if (email.IndexOf('@') == -1)
-                throw new Exception("Invalid email");
-
-            string domain = email.Substring(email.IndexOf('@'));
-            var grain = client.GetGrain<IDomain>(domain);
-            return await grain.Exists(email);
+            try
+            {
+                MailAddress emailAddress = new MailAddress(email);
+                var grain = client.GetGrain<IDomain>(emailAddress.Host);
+                return await grain.Exists(email);
+            }
+            catch (FormatException)
+            {
+                throw new FormatException(String.Format("Invalid email format: '{0}'.", email));
+            }
+            catch (Exception e)
+            {
+                throw new Exception(e.Message);
+            }
         }
     }
 }

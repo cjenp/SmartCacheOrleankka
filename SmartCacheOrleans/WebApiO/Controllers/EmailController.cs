@@ -1,6 +1,8 @@
-﻿using System.Net;
+﻿using System;
+using System.Net;
 using System.Threading.Tasks;
 using CacheGrainInter;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using ServiceInterface;
 
@@ -28,11 +30,18 @@ namespace WebApiO.Controllers
         [HttpGet]
         public async Task<IActionResult> ExistsEmail(string id)
         {
-            var response=await emailChechker.EmailExists(id);
-            if (response)
-                return Ok();
-            else
-                return NotFound();
+            try
+            {
+                var response = await emailChechker.EmailExists(id);
+                if (response)
+                    return Ok();
+                else
+                    return NotFound();
+            }
+            catch(FormatException e)
+            {
+                return BadRequest(e.Message);
+            }
         }
 
         //POST: www.example.com/{id}
@@ -40,11 +49,18 @@ namespace WebApiO.Controllers
         [HttpPost]
         public async Task<IActionResult> Post(string id)
         {
-            var response = await emailChechker.AddEmail(id);
-            if (response)
-                return Created("", id);
-            else
-                return Conflict();
+            try
+            {
+                var response = await emailChechker.AddEmail(id);
+                if (response)
+                    return Created("", id);
+                else
+                    return Conflict();
+            }
+            catch (FormatException e)
+            {
+                return BadRequest(e.Message);
+            }
         }
     }
 }
