@@ -1,17 +1,19 @@
 ﻿using ServiceInterface;
 using System;
 using System.Threading.Tasks;
-using Orleans;
 using CacheGrainInter;
 using System.Net.Mail;
+using Orleankka.Client;
+using Orleankka;
 
 namespace ServiceCode
 {
     public class EmailCheck : IEmailCheck
     {
-        private IClusterClient client;
+        private IClientActorSystem client;
 
-        public EmailCheck(IClusterClient c)
+
+        public EmailCheck(IClientActorSystem c)
         {
             client = c;
         }
@@ -21,8 +23,8 @@ namespace ServiceCode
             try
             {
                 MailAddress emailAddress = new MailAddress(email);
-                var grain = client.GetGrain<IDomain>(emailAddress.Host);
-                return await grain.AddEmail(email);
+                var domain = client.ActorOf<IDomain>(emailAddress.Host);
+                await domain.Tell(new AddEmail(email));
             }
             catch (FormatException)
             {
@@ -30,8 +32,10 @@ namespace ServiceCode
             }
             catch (Exception e)
             {
-                throw new Exception(e.Message);
+                //throw new Exception(e.Message);
+                return false;
             }
+            return true;
         }
 
         public async Task<bool> EmailExists(string email)
@@ -39,8 +43,8 @@ namespace ServiceCode
             try
             {
                 MailAddress emailAddress = new MailAddress(email);
-                var grain = client.GetGrain<IDomain>(emailAddress.Host);
-                return await grain.Exists(email);
+                var domain = client.ActorOf<IDomain>(emailAddress.Host);
+                return await domain.Ask<bool>(new GetDetails());
             }
             catch (FormatException)
             {

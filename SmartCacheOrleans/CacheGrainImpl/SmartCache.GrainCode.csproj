@@ -7,6 +7,9 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Orleans.OrleansCodeGenerator.Build" Version="2.1.2" />
+    <PackageReference Include="Orleankka" Version="2.1.1" />
+    <PackageReference Include="Orleankka.Runtime" Version="2.1.1" />
+    <PackageReference Include="Streamstone" Version="2.2.0" />
   </ItemGroup>
 
   <ItemGroup>

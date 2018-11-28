@@ -10,6 +10,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleankka.Client;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -33,7 +34,7 @@ namespace WebApiO
         // This method gets called by the runtime. Use this method to add services to the container.
         public void ConfigureServices(IServiceCollection services)
         {
-            IClusterClient orleansClient = StartClientWithRetries().GetAwaiter().GetResult();
+            IClientActorSystem orleansClient = StartClientWithRetries().GetAwaiter().GetResult();
             services.AddSingleton<IEmailCheck, EmailCheck>(serviceProvider =>
             {
                 return new EmailCheck(orleansClient);
@@ -62,7 +63,7 @@ namespace WebApiO
 
         }
 
-        private static async Task<IClusterClient> StartClientWithRetries()
+        private static async Task<IClientActorSystem> StartClientWithRetries()
         {
             // Client config
             IClusterClient client;
@@ -74,10 +75,11 @@ namespace WebApiO
                     options.ServiceId = "SmartCache";
                 })
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomain).Assembly).WithReferences())
+                .UseOrleankka()
                 .Build();
 
             await client.Connect(RetryFilter);
-            return client;
+            return client.ActorSystem();
         }
 
         private static async Task<bool> RetryFilter(Exception exception)

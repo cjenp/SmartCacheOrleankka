@@ -2,15 +2,14 @@
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using CacheGrainInter;
-using Orleans;
-using Orleans.Providers;
+using Orleankka.Meta;
 
 namespace CacheGrainImpl
 {
-    [StorageProvider(ProviderName = "blobStore")]
-    public class Domain : Grain<HashSet<string>>, IDomain
+    public class Domain : EventSourcedActor, IDomain
     {
         bool stateChanged = false;
+        HashSet<String> emails=new HashSet<String>();
 
         /// <summary>
         /// Executes on grain activation and starts a timer for saving to storage
@@ -18,7 +17,7 @@ namespace CacheGrainImpl
         /// <returns></returns>
         public override Task OnActivateAsync()
         {
-            RegisterTimer(WriteState, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
+            //RegisterTimer(WriteState, null, TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
             return base.OnActivateAsync();
         }
 
@@ -28,7 +27,7 @@ namespace CacheGrainImpl
         /// <returns></returns>
         public override Task OnDeactivateAsync()
         {
-            WriteState(null).GetAwaiter().GetResult();
+            //WriteState(null).GetAwaiter().GetResult();
             return base.OnDeactivateAsync();
         }
 
@@ -37,7 +36,7 @@ namespace CacheGrainImpl
         /// </summary>
         /// <param name="_"></param>
         /// <returns></returns>
-        private async Task WriteState(object _)
+        /*private async Task WriteState(object _)
         {
             if (!stateChanged)
                 return;
@@ -78,6 +77,29 @@ namespace CacheGrainImpl
                 return Task.FromResult(false);
             else
                 return Task.FromResult(State.Contains(email));
+        }*/
+
+
+        void On(DomainAddedEmail e)
+        {
+            emails.Add(e.Name);
         }
+
+        IEnumerable<Event> Handle(AddEmail cmd)
+        {
+            if (string.IsNullOrEmpty(cmd.Name))
+                throw new ArgumentException("Inventory item name cannot be null or empty");
+
+            if (emails.Contains(cmd.Name))
+                throw new Exception("Email allready exists");
+
+            yield return new DomainAddedEmail(cmd.Name);
+        }
+
+        bool Handle(GetDetails query)
+        {
+            return true;
+        }
+
     }
 }

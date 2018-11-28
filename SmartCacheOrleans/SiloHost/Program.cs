@@ -5,6 +5,11 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
 using Microsoft.Extensions.Logging;
+using Microsoft.WindowsAzure.Storage;
+using CacheGrainImpl;
+using Microsoft.WindowsAzure.Storage.Table;
+using Orleankka.Cluster;
+using Orleans.Storage;
 
 namespace SiloHost
 {
@@ -12,7 +17,19 @@ namespace SiloHost
     {
         public static int Main(string[] args)
         {
+            var account = CloudStorageAccount.DevelopmentStorageAccount;
+            SS.Table = SetupTable(account).GetAwaiter().GetResult();
             return RunMainAsync().Result;
+        }
+
+        static async Task<CloudTable> SetupTable(CloudStorageAccount account)
+        {
+            var table = account
+                .CreateCloudTableClient()
+                .GetTableReference("ssexample");
+
+            await table.CreateIfNotExistsAsync();
+            return table;
         }
 
         private static async Task<int> RunMainAsync()
@@ -46,9 +63,14 @@ namespace SiloHost
                     options.ServiceId = "SmartCache";
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                .AddAzureBlobGrainStorage("blobStore", options => options.ConnectionString = "UseDevelopmentStorage=true")
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
-                .ConfigureLogging(logging => logging.AddConsole());
+                .ConfigureLogging(logging => logging.AddConsole())
+                .AddMemoryGrainStorageAsDefault()
+                .AddMemoryGrainStorage("PubSubStore")
+                .AddSimpleMessageStreamProvider("sms")
+                .ConfigureApplicationParts(x => x.AddApplicationPart(typeof(MemoryGrainStorage).Assembly))
+                .UseInMemoryReminderService()
+                .UseOrleankka();
 
 
             var host = builder.Build();
