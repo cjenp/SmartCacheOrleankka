@@ -26,7 +26,7 @@ namespace SiloHost
         {
             var table = account
                 .CreateCloudTableClient()
-                .GetTableReference("ssexample");
+                .GetTableReference("smartCache");
 
             await table.CreateIfNotExistsAsync();
             return table;
@@ -65,12 +65,9 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
-                .AddMemoryGrainStorageAsDefault()
-                .AddMemoryGrainStorage("PubSubStore")
-                .AddSimpleMessageStreamProvider("sms")
-                .ConfigureApplicationParts(x => x.AddApplicationPart(typeof(MemoryGrainStorage).Assembly))
                 .UseInMemoryReminderService()
                 .UseOrleankka();
+                    
 
 
             var host = builder.Build();

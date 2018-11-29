@@ -12,7 +12,6 @@ namespace ServiceCode
     {
         private IClientActorSystem client;
 
-
         public EmailCheck(IClientActorSystem c)
         {
             client = c;
@@ -26,14 +25,17 @@ namespace ServiceCode
                 var domain = client.ActorOf<IDomain>(emailAddress.Host);
                 await domain.Tell(new AddEmail(email));
             }
+            catch (EmailConflictException)
+            {
+                return false;
+            }
             catch (FormatException)
             {
                 throw new FormatException(String.Format("Invalid email format: '{0}'.",email));
             }
             catch (Exception e)
             {
-                //throw new Exception(e.Message);
-                return false;
+                throw new Exception(e.Message);
             }
             return true;
         }
@@ -44,7 +46,7 @@ namespace ServiceCode
             {
                 MailAddress emailAddress = new MailAddress(email);
                 var domain = client.ActorOf<IDomain>(emailAddress.Host);
-                return await domain.Ask<bool>(new GetDetails());
+                return await domain.Ask<bool>(new CheckEmail(email));
             }
             catch (FormatException)
             {

@@ -8,26 +8,33 @@ namespace CacheGrainInter
     [Serializable]
     public class AddEmail : Command
     {
-        public readonly string Name;
+        public readonly string Email;
 
-        public AddEmail(string name)
+        public AddEmail(string email)
         {
-            Name = name;
+            Email = email;
         }
     }
 
     [Serializable]
-    public class GetDetails : Query<bool>
-    { }
+    public class CheckEmail : Query<bool>
+    {
+        public readonly string Email;
+        public CheckEmail(string email)
+        {
+            Email = email;
+        }
+
+    }
 
     [Serializable]
     public class DomainAddedEmail : Event
     {
-        public readonly string Name;
+        public readonly string Email;
 
-        public DomainAddedEmail(string name)
+        public DomainAddedEmail(string email)
         {
-            Name = name;
+            Email = email;
         }
     }
 }

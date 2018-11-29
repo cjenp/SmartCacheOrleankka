@@ -7,7 +7,7 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.SiloHost", "Silo
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.GrainCode", "CacheGrainImpl\SmartCache.GrainCode.csproj", "{DC6916DD-900C-43BB-85B9-D689709021E5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.GrainInterface", "CacheGrainInter\SmartCache.GrainInterface.csproj", "{B9021B85-7537-4901-B85A-63CD5D090614}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.SharedCode", "CacheGrainInter\SmartCache.SharedCode.csproj", "{B9021B85-7537-4901-B85A-63CD5D090614}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.Web", "WebApiO\SmartCache.Web.csproj", "{42455CE8-382C-49C9-A201-7B1087F2190F}"
 EndProject
