@@ -9,13 +9,14 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Diagnostics;
 using Microsoft.WindowsAzure.Storage.Table;
-using CacheGrainInter;
-using System.Reflection;
 
 namespace CacheGrainImpl
 {
     public abstract class EventSourcedActor : DispatchActorGrain
     {
+        List<Event> eventsCache = new List<Event>();
+        bool stateChanged=false;
+
         static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
         {
             PreserveReferencesHandling = PreserveReferencesHandling.None,
@@ -32,6 +33,26 @@ namespace CacheGrainImpl
         };
 
         Stream stream;
+
+        /// <summary>
+        /// Executes on grain activation and starts a timer for saving to storage
+        /// </summary>
+        /// <returns></returns>
+        public override Task OnActivateAsync()
+        {
+            RegisterTimer(Store, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
+            return base.OnActivateAsync();
+        }
+
+        /// <summary>
+        /// Saves grain state before grain deactivates
+        /// </summary>
+        /// <returns></returns>
+        public override Task OnDeactivateAsync()
+        {
+            Store(null).GetAwaiter().GetResult();
+            return base.OnDeactivateAsync();
+        }
 
         public override async Task<object> Receive(object message)
         {
@@ -93,14 +114,14 @@ namespace CacheGrainImpl
 
         Task<object> HandleQuery(Query query) => Result(Dispatcher.DispatchResult(this, query));
 
-        async Task<object> HandleCommand(Command cmd)
+        Task<object> HandleCommand(Command cmd)
         {
+            stateChanged = true;
             var events = Dispatcher.DispatchResult<IEnumerable<Event>>(this, cmd).ToArray();
-            
-            await Store(events);
+            eventsCache.AddRange(events);
             Apply(events);
 
-            return events;
+            return Result(events);
         }
 
         void Apply(IEnumerable<object> events)
@@ -109,17 +130,19 @@ namespace CacheGrainImpl
                 Dispatcher.Dispatch(this, @event);
         }
 
-        async Task Store(ICollection<object> events)
+        async Task Store(object _)
         {
-            if (events.Count == 0)
+            if (eventsCache.Count == 0 || stateChanged==false)
                 return;
 
-            var serialized = events.Select(ToEventData).ToArray();
+            var serialized = eventsCache.Select(ToEventData).ToArray();
 
             try
             {
                 var result = await Stream.WriteAsync(stream, serialized);
                 stream = result.Stream;
+                stateChanged = false;
+                eventsCache.Clear();
             }
             catch (ConcurrencyConflictException)
             {
