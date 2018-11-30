@@ -14,8 +14,10 @@ namespace CacheGrainImpl
 {
     public abstract class EventSourcedActor : DispatchActorGrain
     {
+        protected HashSet<String> emailsCache = new HashSet<String>();
         List<Event> eventsCache = new List<Event>();
-        bool stateChanged=false;
+        bool stateChanged = false;
+        int eventCount = 0;
 
         static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
         {
@@ -97,6 +99,7 @@ namespace CacheGrainImpl
                     : -1;
 
                 Replay(slice.Events);
+                eventCount += slice.Events.Count();
             }
             while (!slice.IsEndOfStream);
         }
@@ -114,13 +117,21 @@ namespace CacheGrainImpl
 
         Task<object> HandleQuery(Query query) => Result(Dispatcher.DispatchResult(this, query));
 
-        Task<object> HandleCommand(Command cmd)
+        async Task<object> HandleCommand(Command cmd)
         {
             stateChanged = true;
             var events = Dispatcher.DispatchResult<IEnumerable<Event>>(this, cmd).ToArray();
             eventsCache.AddRange(events);
-            Apply(events);
 
+            foreach (var @event in events)
+            {
+                Dispatcher.Dispatch(this, @event);
+                eventCount++;
+                if (eventCount % 5 == 0)
+                {
+                    await Store(new object());
+                }
+            }
             return Result(events);
         }
 
@@ -135,7 +146,24 @@ namespace CacheGrainImpl
             if (eventsCache.Count == 0 || stateChanged==false)
                 return;
 
-            var serialized = eventsCache.Select(ToEventData).ToArray();
+            EventData[] serialized;
+            if (_==null)
+            {
+                serialized = ToEventData(eventsCache);
+            }
+            else
+            {
+                String domain = emailsCache.ElementAt(0).Substring(emailsCache.ElementAt(0).IndexOf("@") + 1);
+                var snapshot = Include.Insert(new EmailsShapshot
+                {
+                    RowKey = "SNAPSHOT_"+ emailsCache.Count/5,
+                    Domain = domain,
+                    Type = emailsCache.GetType().AssemblyQualifiedName,
+                    Data = JsonConvert.SerializeObject(emailsCache, SerializerSettings),
+                    Version = emailsCache.Count
+                });
+                serialized = ToEventData(eventsCache,snapshot);
+            }
 
             try
             {
@@ -165,23 +193,40 @@ namespace CacheGrainImpl
             return JsonConvert.DeserializeObject(@event.Data, eventType, SerializerSettings);
         }
 
-        static EventData ToEventData(object @event)
+        static EventData[] ToEventData(List<Event> events,Include snapshot=null)
         {
-            var id = Guid.NewGuid().ToString("D");
-
-            var properties = new EventEntity
+            EventData[] result=new EventData[events.Count];
+            for(int i=0;i<events.Count;i++)
             {
-                Id = id,
-                Type = @event.GetType().AssemblyQualifiedName,
-                Data = JsonConvert.SerializeObject(@event, SerializerSettings)
-            };
+                var id = Guid.NewGuid().ToString("D");
 
-            return new EventData(EventId.From(id), EventProperties.From(properties));
+                var properties = new EventEntity
+                {
+                    Id = id,
+                    Type = events[i].GetType().AssemblyQualifiedName,
+                    Data = JsonConvert.SerializeObject(events[i], SerializerSettings)
+                };
+
+                if(snapshot != null && i==events.Count-1)
+                    result[i] = new EventData(EventId.From(id), EventProperties.From(properties), EventIncludes.From(snapshot));
+                else
+                    result[i] = new EventData(EventId.From(id), EventProperties.From(properties));
+            }
+
+            return result;
         }
 
         class EventEntity
         {
             public string Id { get; set; }
+            public string Type { get; set; }
+            public string Data { get; set; }
+            public int Version { get; set; }
+        }
+
+        class EmailsShapshot : TableEntity
+        {
+            public String Domain { get; set; }
             public string Type { get; set; }
             public string Data { get; set; }
             public int Version { get; set; }
