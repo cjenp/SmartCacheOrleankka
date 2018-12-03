@@ -7,17 +7,22 @@ using Orleans;
 
 namespace CacheGrainImpl
 {
-    
-    public class Domain : EventSourcedActor, IDomain
+
+    public  class DomainState
+    {
+        public HashSet<string> Emails = new HashSet<string>();
+    }
+
+    public class Domain : EventSourcedActor<DomainState>, IDomain
     {
         void On(DomainAddedEmail e)
         {
-            emailsCache.Add(e.Email);
+            state.Emails.Add(e.Email);
         }
 
         IEnumerable<Event> Handle(AddEmail cmd)
         {
-            if (emailsCache.Contains(cmd.Email))
+            if (state.Emails.Contains(cmd.Email))
                 throw new EmailConflictException("Email allready exists");
 
             yield return new DomainAddedEmail(cmd.Email);
@@ -25,8 +30,7 @@ namespace CacheGrainImpl
 
         bool Handle(CheckEmail query)
         {
-            return emailsCache.Contains(query.Email);
+            return state.Emails.Contains(query.Email);
         }
-
     }
 }

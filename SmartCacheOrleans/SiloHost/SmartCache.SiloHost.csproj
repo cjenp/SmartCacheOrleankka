@@ -15,6 +15,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\AzureBlobStorage\AzureBlobStorage.csproj" />
     <ProjectReference Include="..\CacheGrainImpl\SmartCache.GrainCode.csproj" />
   </ItemGroup>
 

@@ -10,6 +10,7 @@ using CacheGrainImpl;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleankka.Cluster;
 using Orleans.Storage;
+using AzureBlobStorage;
 
 namespace SiloHost
 {
@@ -17,9 +18,16 @@ namespace SiloHost
     {
         public static int Main(string[] args)
         {
-            var account = CloudStorageAccount.DevelopmentStorageAccount;
-            SS.Table = SetupTable(account).GetAwaiter().GetResult();
-            return RunMainAsync().Result;
+            SnapshotStore<String> bs = new SnapshotStore<String>();
+            bs.WriteSnapshot("S1").GetAwaiter().GetResult();
+            bs.ReadLastSnapshot();
+            //String s = bs.ReadEvents().GetAwaiter().GetResult();
+
+
+            return 0;
+            //var account = CloudStorageAccount.DevelopmentStorageAccount;
+            //SS.Table = SetupTable(account).GetAwaiter().GetResult();
+            //return RunMainAsync().Result;
         }
 
         static async Task<CloudTable> SetupTable(CloudStorageAccount account)
