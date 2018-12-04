@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using AzureBlobStorage;
 using CacheGrainInter;
 using Orleankka;
 using Orleankka.Meta;
@@ -15,6 +16,10 @@ namespace CacheGrainImpl
 
     public class Domain : EventSourcedActor<DomainState>, IDomain
     {
+        public Domain(ISnapshotStore snapshotStore, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(snapshotStore, id, runtime, dispatcher)
+        {
+        }
+
         void On(DomainAddedEmail e)
         {
             state.Emails.Add(e.Email);

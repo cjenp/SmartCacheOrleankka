@@ -9,6 +9,8 @@ using System.Threading.Tasks;
 using System.Linq;
 using System.Diagnostics;
 using Microsoft.WindowsAzure.Storage.Table;
+using AzureBlobStorage;
+using CacheGrainInter;
 
 namespace CacheGrainImpl
 {
@@ -16,9 +18,15 @@ namespace CacheGrainImpl
     public abstract class EventSourcedActor<T> : DispatchActorGrain
     {
         public T state;
-        List<Event> eventsCache = new List<Event>();
-        bool stateChanged = false;
+        ISnapshotStore snapshotStore;
+        SnapshotStream<T> snapStream;
         int eventCount = 0;
+        int eventsPerSnapshot = 5;
+
+        public EventSourcedActor(ISnapshotStore SnapshotStore,string id = null, IActorRuntime runtime= null, Dispatcher dispatcher= null):base(id, runtime,dispatcher)
+        {
+            snapshotStore = SnapshotStore;
+        }
 
         static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
         {
@@ -36,6 +44,7 @@ namespace CacheGrainImpl
         };
 
         Stream stream;
+        Stream snapShotStream;
 
         /// <summary>
         /// Executes on grain activation and starts a timer for saving to storage
@@ -43,18 +52,15 @@ namespace CacheGrainImpl
         /// <returns></returns>
         public override Task OnActivateAsync()
         {
+            snapStream = snapshotStore.ProvisonStream<T>(Id.Replace(".", "").ToLower());
+
+            container/[filename](actorId/snapshotVersion.json)
             state = Activator.CreateInstance<T>();
-            RegisterTimer(Store, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(1));
             return base.OnActivateAsync();
         }
 
-        /// <summary>
-        /// Saves grain state before grain deactivates
-        /// </summary>
-        /// <returns></returns>
         public override Task OnDeactivateAsync()
         {
-            Store(null).GetAwaiter().GetResult();
             return base.OnDeactivateAsync();
         }
 
@@ -63,6 +69,7 @@ namespace CacheGrainImpl
             switch (message)
             {
                 case Activate _:
+                    await LoadSnapshot();
                     await Load();
                     return Done;
 
@@ -75,6 +82,33 @@ namespace CacheGrainImpl
                 default:
                     return await base.Receive(message);
             }
+        }
+
+        public async Task LoadSnapshot()
+        {
+            var partition = new Partition(SS.Table, SnapshotStreamName());
+            var existent = await Stream.TryOpenAsync(partition);
+            if (!existent.Found)
+            {
+                snapShotStream = new Stream(partition);
+                return;
+            }
+
+            snapShotStream = existent.Stream;
+            StreamSlice<EventEntity> slice;
+
+            snapShotStream = await Stream.OpenAsync(partition);
+            int vers = snapShotStream.Version;
+
+
+            if(vers>0)
+            {
+                eventCount = vers * eventsPerSnapshot;
+                slice = await Stream.ReadAsync<EventEntity>(partition, vers, 1);
+                var ev = (SnapshotData)DeserializeEvent(slice.Events.Last());
+                state = snapStream.ReadSnapshotFromUri(ev.SnapshotUri);
+            }
+            
         }
 
         async Task Load()
@@ -90,7 +124,7 @@ namespace CacheGrainImpl
 
             stream = existent.Stream;
             StreamSlice<EventEntity> slice;
-            var nextSliceStart = 1;
+            var nextSliceStart = eventCount+1;
 
             do
             {
@@ -111,6 +145,11 @@ namespace CacheGrainImpl
             return GetType().Name + "-" + Id;
         }
 
+        string SnapshotStreamName()
+        {
+            return GetType().Name + "-" + Id + "-" +"Snapshot";
+        }
+
         void Replay(IEnumerable<EventEntity> events)
         {
             var deserialized = events.Select(DeserializeEvent).ToArray();
@@ -121,15 +160,14 @@ namespace CacheGrainImpl
 
         async Task<object> HandleCommand(Command cmd)
         {
-            stateChanged = true;
             var events = Dispatcher.DispatchResult<IEnumerable<Event>>(this, cmd).ToArray();
-            eventsCache.AddRange(events);
+            await Store(events);
 
             foreach (var @event in events)
             {
                 Dispatcher.Dispatch(this, @event);
                 eventCount++;
-                if (eventCount % 5 == 0)
+                if (eventCount % eventsPerSnapshot == 0)
                 {
                     await CreateSnapshot();
                 }
@@ -143,19 +181,17 @@ namespace CacheGrainImpl
                 Dispatcher.Dispatch(this, @event);
         }
 
-        async Task Store(object _)
+        async Task Store(Event[] @events)
         {
-            if (eventsCache.Count == 0 || stateChanged==false)
+            if (events == null || @events.Length == 0)
                 return;
 
-            var serialized = ToEventData(eventsCache);
+            var serialized = ToEventData(events);
 
             try
             {
                 var result = await Stream.WriteAsync(stream, serialized);
                 stream = result.Stream;
-                stateChanged = false;
-                eventsCache.Clear();
             }
             catch (ConcurrencyConflictException)
             {
@@ -170,23 +206,24 @@ namespace CacheGrainImpl
 
         async Task CreateSnapshot()
         {
-            var snapshot = Include.Insert(new EmailsShapshot
-            {
-                RowKey = "SNAPSHOT_",
-                Type = state.GetType().AssemblyQualifiedName,
-                Data = JsonConvert.SerializeObject(state, SerializerSettings),
-                Version = 1//GetStateVersion()
-            });
-
-            var id = Guid.NewGuid().ToString("D");
-            var serialized = new EventData(EventId.From(id), EventIncludes.From(snapshot));
-
             try
             {
-                var result = await Stream.WriteAsync(stream, serialized);
-                stream = result.Stream;
-                stateChanged = false;
-                eventsCache.Clear();
+                String snapUri = await snapStream.WriteSnapshot(state,eventCount);
+                SnapshotData snapshot=new SnapshotData(snapUri);
+               EventData[] eventDatas = new EventData[1];
+
+                var id = Guid.NewGuid().ToString("D");
+
+                var properties = new EventEntity
+                {
+                    Id = id,
+                    Type = typeof(SnapshotData).AssemblyQualifiedName,
+                    Data = JsonConvert.SerializeObject(snapshot, SerializerSettings),
+                };
+                eventDatas[0] = new EventData(EventId.From(id), EventProperties.From(properties));
+
+                var result = await Stream.WriteAsync(snapShotStream, eventDatas);
+                snapShotStream = result.Stream;
             }
             catch (ConcurrencyConflictException)
             {
@@ -196,6 +233,10 @@ namespace CacheGrainImpl
 
                 Activation.DeactivateOnIdle();
                 throw new InvalidOperationException("Duplicate activation of actor '" + Self + "' detected");
+            }
+            catch (Exception e)
+            {
+                throw e;
             }
         }
 
@@ -209,10 +250,10 @@ namespace CacheGrainImpl
             return JsonConvert.DeserializeObject(@event.Data, eventType, SerializerSettings);
         }
 
-        static EventData[] ToEventData(List<Event> events,Include snapshot=null)
+        static EventData[] ToEventData(Event[] events)
         {
-            EventData[] result=new EventData[events.Count];
-            for(int i=0;i<events.Count;i++)
+            EventData[] result=new EventData[events.Length];
+            for(int i=0;i<events.Length;i++)
             {
                 var id = Guid.NewGuid().ToString("D");
 
@@ -222,36 +263,15 @@ namespace CacheGrainImpl
                     Type = events[i].GetType().AssemblyQualifiedName,
                     Data = JsonConvert.SerializeObject(events[i], SerializerSettings)
                 };
-
-                if(snapshot != null && i==events.Count-1)
-                    result[i] = new EventData(EventId.From(id), EventProperties.From(properties), EventIncludes.From(snapshot));
-                else
-                    result[i] = new EventData(EventId.From(id), EventProperties.From(properties));
+                result[i] = new EventData(EventId.From(id), EventProperties.From(properties));
             }
 
             return result;
         }
 
-
-
         class EventEntity
         {
             public string Id { get; set; }
-            public string Type { get; set; }
-            public string Data { get; set; }
-            public int Version { get; set; }
-        }
-
-        class SnapshotEntity
-        {
-            public string Id { get; set; }
-            public string Type { get; set; }
-            public string Data { get; set; }
-            public int Version { get; set; }
-        }
-
-        class EmailsShapshot : TableEntity
-        {
             public string Type { get; set; }
             public string Data { get; set; }
             public int Version { get; set; }

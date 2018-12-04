@@ -9,25 +9,37 @@ using Microsoft.WindowsAzure.Storage;
 using CacheGrainImpl;
 using Microsoft.WindowsAzure.Storage.Table;
 using Orleankka.Cluster;
-using Orleans.Storage;
+using Microsoft.Extensions.DependencyInjection;
+using CacheGrainInter;
 using AzureBlobStorage;
+using Newtonsoft.Json;
+using System.Globalization;
 
 namespace SiloHost
 {
     public class Program
     {
+        static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
+        {
+            PreserveReferencesHandling = PreserveReferencesHandling.None,
+            NullValueHandling = NullValueHandling.Ignore,
+            DefaultValueHandling = DefaultValueHandling.Ignore,
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            ObjectCreationHandling = ObjectCreationHandling.Replace,
+            ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
+            Culture = CultureInfo.GetCultureInfo("en-US"),
+            DateFormatHandling = DateFormatHandling.IsoDateFormat,
+            TypeNameHandling = TypeNameHandling.None,
+            FloatParseHandling = FloatParseHandling.Decimal,
+            Formatting = Formatting.None
+        };
+
+        private static CloudStorageAccount csAccount;
         public static int Main(string[] args)
         {
-            SnapshotStore<String> bs = new SnapshotStore<String>();
-            bs.WriteSnapshot("S1").GetAwaiter().GetResult();
-            bs.ReadLastSnapshot();
-            //String s = bs.ReadEvents().GetAwaiter().GetResult();
-
-
-            return 0;
-            //var account = CloudStorageAccount.DevelopmentStorageAccount;
-            //SS.Table = SetupTable(account).GetAwaiter().GetResult();
-            //return RunMainAsync().Result;
+            csAccount = CloudStorageAccount.DevelopmentStorageAccount;
+            SS.Table = SetupTable(csAccount).GetAwaiter().GetResult();
+            return RunMainAsync().Result;
         }
 
         static async Task<CloudTable> SetupTable(CloudStorageAccount account)
@@ -73,10 +85,9 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
+                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotStore(csAccount, SerializerSettings)))
                 .UseInMemoryReminderService()
                 .UseOrleankka();
-                    
-
 
             var host = builder.Build();
             
@@ -84,4 +95,5 @@ namespace SiloHost
             return host;
         }
     }
+
 }

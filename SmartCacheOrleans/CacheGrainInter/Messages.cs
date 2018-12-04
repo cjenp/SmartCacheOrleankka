@@ -37,4 +37,15 @@ namespace CacheGrainInter
             Email = email;
         }
     }
+
+    [Serializable]
+    public class SnapshotData
+    {
+        public readonly string SnapshotUri;
+
+        public SnapshotData(string snapshotUri)
+        {
+            SnapshotUri = snapshotUri;
+        }
+    }
 }

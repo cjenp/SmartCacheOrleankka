@@ -15,7 +15,9 @@ Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.ServiceInterface
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "SmartCache.ServiceCode", "ServiceCode\SmartCache.ServiceCode.csproj", "{2A6FADF5-F95C-41AA-9D30-50DE8F68A184}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AzureBlobStorage", "AzureBlobStorage\AzureBlobStorage.csproj", "{104EB08F-F8DE-49DF-976C-28DDE4C89881}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "AzureBlobStorage", "AzureBlobStorage\AzureBlobStorage.csproj", "{104EB08F-F8DE-49DF-976C-28DDE4C89881}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UnitTest", "UnitTest\UnitTest.csproj", "{A74C5E18-07C2-4295-8B23-DD732CC45546}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -51,6 +53,10 @@ Global
 		{104EB08F-F8DE-49DF-976C-28DDE4C89881}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{104EB08F-F8DE-49DF-976C-28DDE4C89881}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{104EB08F-F8DE-49DF-976C-28DDE4C89881}.Release|Any CPU.Build.0 = Release|Any CPU
+		{A74C5E18-07C2-4295-8B23-DD732CC45546}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{A74C5E18-07C2-4295-8B23-DD732CC45546}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{A74C5E18-07C2-4295-8B23-DD732CC45546}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{A74C5E18-07C2-4295-8B23-DD732CC45546}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
