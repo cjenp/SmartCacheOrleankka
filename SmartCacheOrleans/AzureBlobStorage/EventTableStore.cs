@@ -18,7 +18,7 @@ namespace AzureBlobStorage
         private CloudStorageAccount cloudStorageAccount;
         private CloudTable cloudTable;
 
-        static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
+        static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings()
         {
             PreserveReferencesHandling = PreserveReferencesHandling.None,
             NullValueHandling = NullValueHandling.Ignore,
@@ -33,10 +33,16 @@ namespace AzureBlobStorage
             Formatting = Formatting.None
         };
 
-        // predpostavimo da container obstaja
-        public EventTableStore(string AzureCloudCredentials, string TableName, JsonSerializerSettings JsonSerializerSettings=SerializerSettings)
+        public EventTableStore(string AzureConnectionString, string TableName)
         {
-            cloudStorageAccount = new CloudStorageAccount(AzureCloudCredentials, true);
+            cloudStorageAccount = CloudStorageAccount.Parse(AzureConnectionString);
+            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(TableName);
+            jsonSerializerSettings = SerializerSettings;
+        }
+
+        public EventTableStore(string AzureConnectionString, string TableName, JsonSerializerSettings JsonSerializerSettings)
+        {
+            cloudStorageAccount = CloudStorageAccount.Parse(AzureConnectionString);
             cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(TableName);
             jsonSerializerSettings = JsonSerializerSettings;
         }

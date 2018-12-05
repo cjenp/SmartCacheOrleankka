@@ -24,7 +24,7 @@ namespace SiloHost
             MissingMemberHandling = MissingMemberHandling.Ignore,
             ObjectCreationHandling = ObjectCreationHandling.Replace,
             ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
-            Culture = CultureInfo.GetCultureInfo("en-US"),
+            Culture = CultureInfo.InvariantCulture,
             DateFormatHandling = DateFormatHandling.IsoDateFormat,
             TypeNameHandling = TypeNameHandling.None,
             FloatParseHandling = FloatParseHandling.Decimal,
@@ -71,8 +71,8 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
-                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotBlobStore(csAccount, SerializerSettings,"orleankka","orleankkatable")))
-                .ConfigureServices(d => d.AddSingleton<IEventTableStore>(new EventTableStore(csAccount, SerializerSettings, "events")))
+                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotBlobStore("UseDevelopmentStorage=true", "orleankka","orleankkatable", SerializerSettings)))
+                .ConfigureServices(d => d.AddSingleton<IEventTableStore>(new EventTableStore("UseDevelopmentStorage=true", "events", SerializerSettings)))
                 .UseInMemoryReminderService()
                 .UseOrleankka();
 

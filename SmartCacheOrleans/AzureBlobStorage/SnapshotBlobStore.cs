@@ -24,27 +24,25 @@ namespace AzureBlobStorage
             MissingMemberHandling = MissingMemberHandling.Ignore,
             ObjectCreationHandling = ObjectCreationHandling.Replace,
             ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
-            Culture = CultureInfo.GetCultureInfo("en-US"),
+            Culture = CultureInfo.InvariantCulture,
             DateFormatHandling = DateFormatHandling.IsoDateFormat,
             TypeNameHandling = TypeNameHandling.None,
             FloatParseHandling = FloatParseHandling.Decimal,
             Formatting = Formatting.None
         };
 
-        // predpostavimo da container obstaja
-        public SnapshotBlobStore()
+        public SnapshotBlobStore(string AzureConnectionString, string ContainerName, string TableName)
         {
-            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference("table-x");
-            containerName = "container-x";
-            cloudStorageAccount = CloudStorageAccount.DevelopmentStorageAccount;
+            cloudStorageAccount = CloudStorageAccount.Parse(AzureConnectionString);
             blobClient = cloudStorageAccount.CreateCloudBlobClient();
+            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(TableName);
             jsonSerializerSettings = SerializerSettings;
+            containerName = ContainerName;
         }
 
-        // predpostavimo da container obstaja
-        public SnapshotBlobStore(CloudStorageAccount CloudStorageAccount, JsonSerializerSettings JsonSerializerSettings, string ContainerName, string TableName)
+        public SnapshotBlobStore(string AzureConnectionString, string ContainerName, string TableName, JsonSerializerSettings JsonSerializerSettings)
         {
-            cloudStorageAccount = CloudStorageAccount;
+            cloudStorageAccount = CloudStorageAccount.Parse(AzureConnectionString);
             blobClient = cloudStorageAccount.CreateCloudBlobClient();
             cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(TableName);
             jsonSerializerSettings = JsonSerializerSettings;
