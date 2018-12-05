@@ -1,10 +1,5 @@
-﻿using System;
-using System.Globalization;
-using System.IO;
-using System.Net;
-using System.Text;
+﻿using System.Globalization;
 using System.Threading.Tasks;
-using CacheGrainInter;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
@@ -16,6 +11,8 @@ namespace AzureBlobStorage
         private CloudBlobClient blobClient;
         private CloudStorageAccount cloudStorageAccount;
         private JsonSerializerSettings jsonSerializerSettings;
+        private CloudBlobContainer blobContainer;
+        private string containerName;
 
         static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
         {
@@ -35,22 +32,27 @@ namespace AzureBlobStorage
         // predpostavimo da container obstaja
         public SnapshotStore()
         {
+            containerName = "container-x";
             cloudStorageAccount = CloudStorageAccount.DevelopmentStorageAccount;
             blobClient = cloudStorageAccount.CreateCloudBlobClient();
             jsonSerializerSettings = SerializerSettings;
         }
 
         // predpostavimo da container obstaja
-        public SnapshotStore(CloudStorageAccount CloudStorageAccount, JsonSerializerSettings JsonSerializerSettings)
+        public SnapshotStore(CloudStorageAccount CloudStorageAccount, JsonSerializerSettings JsonSerializerSettings, string ContainerName)
         {
             cloudStorageAccount = CloudStorageAccount;
             blobClient = cloudStorageAccount.CreateCloudBlobClient();
             jsonSerializerSettings = JsonSerializerSettings;
+            containerName = ContainerName;
         }
 
-        public SnapshotStream<T> ProvisonStream<T>(string actorId)
+        public async Task<SnapshotStream<T>> ProvisonStream<T>(string actorId)
         {
-            return new SnapshotStream<T>(actorId, blobClient, SerializerSettings);
+            blobContainer = blobClient.GetContainerReference(containerName);
+            await blobContainer.CreateIfNotExistsAsync();
+            await blobContainer.SetPermissionsAsync(new BlobContainerPermissions { PublicAccess = BlobContainerPublicAccessType.Container });
+            return new SnapshotStream<T>(actorId, blobContainer, SerializerSettings);
         }
 
     }

@@ -85,7 +85,7 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
-                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotStore(csAccount, SerializerSettings)))
+                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotStore(csAccount, SerializerSettings,"orleankka")))
                 .UseInMemoryReminderService()
                 .UseOrleankka();
 

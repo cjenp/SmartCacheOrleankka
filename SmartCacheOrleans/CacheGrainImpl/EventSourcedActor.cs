@@ -21,7 +21,7 @@ namespace CacheGrainImpl
         ISnapshotStore snapshotStore;
         SnapshotStream<T> snapStream;
         int eventCount = 0;
-        int eventsPerSnapshot = 5;
+        int eventsPerSnapshot = 3;
 
         public EventSourcedActor(ISnapshotStore SnapshotStore,string id = null, IActorRuntime runtime= null, Dispatcher dispatcher= null):base(id, runtime,dispatcher)
         {
@@ -50,13 +50,10 @@ namespace CacheGrainImpl
         /// Executes on grain activation and starts a timer for saving to storage
         /// </summary>
         /// <returns></returns>
-        public override Task OnActivateAsync()
+        public async override Task OnActivateAsync()
         {
-            snapStream = snapshotStore.ProvisonStream<T>(Id.Replace(".", "").ToLower());
-
-            container/[filename](actorId/snapshotVersion.json)
             state = Activator.CreateInstance<T>();
-            return base.OnActivateAsync();
+            await base.OnActivateAsync();
         }
 
         public override Task OnDeactivateAsync()
@@ -86,6 +83,10 @@ namespace CacheGrainImpl
 
         public async Task LoadSnapshot()
         {
+            if (snapStream == null)
+            {
+                snapStream = await snapshotStore.ProvisonStream<T>(Id);
+            }
             var partition = new Partition(SS.Table, SnapshotStreamName());
             var existent = await Stream.TryOpenAsync(partition);
             if (!existent.Found)
@@ -103,9 +104,9 @@ namespace CacheGrainImpl
 
             if(vers>0)
             {
-                eventCount = vers * eventsPerSnapshot;
                 slice = await Stream.ReadAsync<EventEntity>(partition, vers, 1);
                 var ev = (SnapshotData)DeserializeEvent(slice.Events.Last());
+                eventCount = slice.Events.Last().EventsInSnapshot;
                 state = snapStream.ReadSnapshotFromUri(ev.SnapshotUri);
             }
             
@@ -208,8 +209,8 @@ namespace CacheGrainImpl
         {
             try
             {
-                String snapUri = await snapStream.WriteSnapshot(state,eventCount);
-                SnapshotData snapshot=new SnapshotData(snapUri);
+               String snapUri = await snapStream.WriteSnapshot(state,eventCount);
+               SnapshotData snapshot=new SnapshotData(snapUri);
                EventData[] eventDatas = new EventData[1];
 
                 var id = Guid.NewGuid().ToString("D");
@@ -219,6 +220,7 @@ namespace CacheGrainImpl
                     Id = id,
                     Type = typeof(SnapshotData).AssemblyQualifiedName,
                     Data = JsonConvert.SerializeObject(snapshot, SerializerSettings),
+                    EventsInSnapshot = eventCount
                 };
                 eventDatas[0] = new EventData(EventId.From(id), EventProperties.From(properties));
 
@@ -275,6 +277,7 @@ namespace CacheGrainImpl
             public string Type { get; set; }
             public string Data { get; set; }
             public int Version { get; set; }
+            public int EventsInSnapshot { get; set; }
         }
     }
 

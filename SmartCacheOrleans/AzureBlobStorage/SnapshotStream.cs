@@ -10,25 +10,25 @@ namespace AzureBlobStorage
 {
     public interface ISnapshotStore
     {
-        SnapshotStream<T> ProvisonStream<T>(string actorID);
+        Task<SnapshotStream<T>> ProvisonStream<T>(string IdActor);
     }
 
     public class SnapshotStream<T>
     {
         private CloudBlobContainer blobContainer;
         private JsonSerializerSettings jSSettings;
+        private String idActor;
 
-        public SnapshotStream(String idActor,CloudBlobClient cbc, JsonSerializerSettings jsonSerializerSettings)
+        public SnapshotStream(String IdActor, CloudBlobContainer BlobContainer, JsonSerializerSettings jsonSerializerSettings)
         {
-            blobContainer = cbc.GetContainerReference(idActor);
+            blobContainer = BlobContainer;
+            idActor = IdActor;
             jSSettings = jsonSerializerSettings;
         }
 
         public async Task<String> WriteSnapshot(T snapshot, int snapshotVersion)
         {
-            await blobContainer.CreateIfNotExistsAsync();
-            await blobContainer.SetPermissionsAsync(new BlobContainerPermissions { PublicAccess = BlobContainerPublicAccessType.Container });
-            CloudBlockBlob blob = blobContainer.GetBlockBlobReference("idActor/" + snapshotVersion);
+            CloudBlockBlob blob = blobContainer.GetBlockBlobReference(String.Format("{0}/Snapshot_{1}", idActor,snapshotVersion));
             string data = JsonConvert.SerializeObject(snapshot);
             using (var stream = new MemoryStream(Encoding.Default.GetBytes(data), false))
             {
