@@ -42,10 +42,20 @@ namespace CacheGrainInter
     public class SnapshotData
     {
         public readonly string SnapshotUri;
+        public readonly int EventsInSNapshot;
 
-        public SnapshotData(string snapshotUri)
+        public SnapshotData(string snapshotUri, int eventsInSNapshot)
         {
             SnapshotUri = snapshotUri;
+            EventsInSNapshot = eventsInSNapshot;
         }
+    }
+
+    public class EventEntity
+    {
+        public string Id { get; set; }
+        public string Type { get; set; }
+        public string Data { get; set; }
+        public int Version { get; set; }
     }
 }

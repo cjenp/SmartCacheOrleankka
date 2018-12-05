@@ -6,11 +6,8 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.WindowsAzure.Storage;
-using CacheGrainImpl;
-using Microsoft.WindowsAzure.Storage.Table;
 using Orleankka.Cluster;
 using Microsoft.Extensions.DependencyInjection;
-using CacheGrainInter;
 using AzureBlobStorage;
 using Newtonsoft.Json;
 using System.Globalization;
@@ -38,18 +35,7 @@ namespace SiloHost
         public static int Main(string[] args)
         {
             csAccount = CloudStorageAccount.DevelopmentStorageAccount;
-            SS.Table = SetupTable(csAccount).GetAwaiter().GetResult();
             return RunMainAsync().Result;
-        }
-
-        static async Task<CloudTable> SetupTable(CloudStorageAccount account)
-        {
-            var table = account
-                .CreateCloudTableClient()
-                .GetTableReference("smartCache");
-
-            await table.CreateIfNotExistsAsync();
-            return table;
         }
 
         private static async Task<int> RunMainAsync()
@@ -85,7 +71,8 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddConsole())
-                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotStore(csAccount, SerializerSettings,"orleankka")))
+                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotBlobStore(csAccount, SerializerSettings,"orleankka","orleankkatable")))
+                .ConfigureServices(d => d.AddSingleton<IEventTableStore>(new EventTableStore(csAccount, SerializerSettings, "events")))
                 .UseInMemoryReminderService()
                 .UseOrleankka();
 

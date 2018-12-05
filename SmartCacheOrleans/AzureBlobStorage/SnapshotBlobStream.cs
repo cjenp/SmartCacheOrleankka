@@ -1,4 +1,5 @@
-﻿using Microsoft.WindowsAzure.Storage.Blob;
+﻿using CacheGrainInter;
+using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
 using System;
 using System.IO;
@@ -10,34 +11,47 @@ namespace AzureBlobStorage
 {
     public interface ISnapshotStore
     {
-        Task<SnapshotStream<T>> ProvisonStream<T>(string IdActor);
+        Task<SnapshotBlobStream> ProvisonSnapshotStream(string IdActor);
     }
 
-    public class SnapshotStream<T>
+    public class SnapshotBlobStream
     {
         private CloudBlobContainer blobContainer;
         private JsonSerializerSettings jSSettings;
         private String idActor;
+        private EventTableStoreStream eventTableStoreStream;
 
-        public SnapshotStream(String IdActor, CloudBlobContainer BlobContainer, JsonSerializerSettings jsonSerializerSettings)
+        public SnapshotBlobStream(String IdActor, CloudBlobContainer BlobContainer, JsonSerializerSettings jsonSerializerSettings, EventTableStoreStream EventTableStoreStream)
         {
             blobContainer = BlobContainer;
             idActor = IdActor;
             jSSettings = jsonSerializerSettings;
+            eventTableStoreStream = EventTableStoreStream;
         }
 
-        public async Task<String> WriteSnapshot(T snapshot, int snapshotVersion)
+        public async Task WriteSnapshot(Object snapshot, int eventCount)
         {
-            CloudBlockBlob blob = blobContainer.GetBlockBlobReference(String.Format("{0}/Snapshot_{1}", idActor,snapshotVersion));
+            CloudBlockBlob blob = blobContainer.GetBlockBlobReference(String.Format("{0}/Snapshot_{1}", idActor, eventCount));
             string data = JsonConvert.SerializeObject(snapshot);
             using (var stream = new MemoryStream(Encoding.Default.GetBytes(data), false))
             {
                 await blob.UploadFromStreamAsync(stream);
             }
-            return blob.Uri.AbsoluteUri;
+            var uri=blob.Uri.AbsoluteUri;
+            await eventTableStoreStream.StoreSnapshot(uri, eventCount);
         }
 
-        public T ReadSnapshotFromUri(String uri)
+        public int Version()
+        {
+            return eventTableStoreStream.Version;
+        }
+
+        public async Task<SnapshotData> ReadSnapshot(int ver=0)
+        {
+            return await eventTableStoreStream.ReadSnapshot(ver);
+        }
+
+        public T ReadSnapshotFromUri<T>(String uri)
         {
             var webRequest = WebRequest.Create(uri);
             string strContent = String.Empty;

@@ -2,15 +2,17 @@
 using System.Threading.Tasks;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 
 namespace AzureBlobStorage
 {
-    public class SnapshotStore : ISnapshotStore
+    public class SnapshotBlobStore : ISnapshotStore
     {
-        private CloudBlobClient blobClient;
-        private CloudStorageAccount cloudStorageAccount;
         private JsonSerializerSettings jsonSerializerSettings;
+        private CloudStorageAccount cloudStorageAccount;
+        private CloudTable cloudTable;
+        private CloudBlobClient blobClient;
         private CloudBlobContainer blobContainer;
         private string containerName;
 
@@ -30,8 +32,9 @@ namespace AzureBlobStorage
         };
 
         // predpostavimo da container obstaja
-        public SnapshotStore()
+        public SnapshotBlobStore()
         {
+            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference("table-x");
             containerName = "container-x";
             cloudStorageAccount = CloudStorageAccount.DevelopmentStorageAccount;
             blobClient = cloudStorageAccount.CreateCloudBlobClient();
@@ -39,23 +42,23 @@ namespace AzureBlobStorage
         }
 
         // predpostavimo da container obstaja
-        public SnapshotStore(CloudStorageAccount CloudStorageAccount, JsonSerializerSettings JsonSerializerSettings, string ContainerName)
+        public SnapshotBlobStore(CloudStorageAccount CloudStorageAccount, JsonSerializerSettings JsonSerializerSettings, string ContainerName, string TableName)
         {
             cloudStorageAccount = CloudStorageAccount;
             blobClient = cloudStorageAccount.CreateCloudBlobClient();
+            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(TableName);
             jsonSerializerSettings = JsonSerializerSettings;
             containerName = ContainerName;
         }
 
-        public async Task<SnapshotStream<T>> ProvisonStream<T>(string actorId)
+        public async Task<SnapshotBlobStream> ProvisonSnapshotStream(string actorId)
         {
+            await cloudTable.CreateIfNotExistsAsync();
             blobContainer = blobClient.GetContainerReference(containerName);
             await blobContainer.CreateIfNotExistsAsync();
             await blobContainer.SetPermissionsAsync(new BlobContainerPermissions { PublicAccess = BlobContainerPublicAccessType.Container });
-            return new SnapshotStream<T>(actorId, blobContainer, SerializerSettings);
+
+            return new SnapshotBlobStream(actorId, blobContainer, SerializerSettings, new EventTableStoreStream(cloudTable, actorId, jsonSerializerSettings));
         }
-
     }
-
-
 }
