@@ -2,6 +2,8 @@
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Orleankka.Meta;
+using Serilog;
+using Serilog.Context;
 using Streamstone;
 using System;
 using System.Collections.Generic;
@@ -15,29 +17,30 @@ namespace AzureBlobStorage
         JsonSerializerSettings serializerSettings;
         Partition partition;
         Stream stream;
-        public int Version=-1;
+        private int version=-1;
+        ILogger log;
 
-        public EventTableStoreStream(CloudTable CloudTable,string StreamName, JsonSerializerSettings SerializerSettings)
+
+        public EventTableStoreStream(CloudTable CloudTable,string StreamName, JsonSerializerSettings SerializerSettings, ILogger Log)
         {
             serializerSettings = SerializerSettings;
             partition = new Partition(CloudTable, StreamName);
+            log = Log.ForContext<EventTableStoreStream>();
         }
 
-        private async Task<bool> CreateStreamIfNotExists()
+        private async Task CreateStreamIfNotExists()
         {
             var existent = await Stream.TryOpenAsync(partition);
-            if (!existent.Found)
-            {
-                stream = new Stream(partition);
-                Version = stream.Version;
-                return false;
-            }
-            else
-            {
-                stream = existent.Stream;
-                Version = stream.Version;
-                return true;
-            }
+            stream = existent.Found
+                ? existent.Stream : new Stream(partition);
+            version = stream.Version;
+
+        }
+
+        public async Task<int> GetVersion()
+        {
+            await CreateStreamIfNotExists();
+            return version;
         }
 
         public async Task StoreEvents(Event[] events)
@@ -55,18 +58,20 @@ namespace AzureBlobStorage
             }
             catch (ConcurrencyConflictException e)
             {
-                //Console.WriteLine("Concurrency conflict on stream '{0}' detected", StreamName());
-                //Console.WriteLine("Probably, second activation of actor '{0}' has been created", Self);
-                //Console.WriteLine("Deactivating duplicate activation '{0}' ... ", Self);
+                log.Error(e,"Concurrency conflict detected");
                 throw e;
-                //throw new InvalidOperationException("Duplicate activation of actor '" + Self + "' detected");
+            }
+            catch (Exception e)
+            {
+                log.Error(e,"Exception occured while writing to event store");
+                throw e;
             }
         }
 
         public async Task StoreSnapshot(String uri,int eventCount)
         {
             SnapshotData snapshotData = new SnapshotData(uri,eventCount);
-
+            log.Information("Storing snapshot uri ({SnapshotUri})", uri);
             await CreateStreamIfNotExists();
             var id = Guid.NewGuid().ToString("D");
             var properties = new EventEntity
@@ -84,14 +89,12 @@ namespace AzureBlobStorage
             }
             catch (ConcurrencyConflictException e)
             {
-                //Console.WriteLine("Concurrency conflict on stream '{0}' detected", StreamName());
-                //Console.WriteLine("Probably, second activation of actor '{0}' has been created", Self);
-                //Console.WriteLine("Deactivating duplicate activation '{0}' ... ", Self);
+                log.Error(e,"Concurrency conflict on stream detected");
                 throw e;
-                //throw new InvalidOperationException("Duplicate activation of actor '" + Self + "' detected");
             }
             catch(Exception e)
             {
+                log.Error(e, "Exception occured while storing snapshot");
                 throw e;
             }
         }
@@ -99,43 +102,54 @@ namespace AzureBlobStorage
         public async Task<IEnumerable<object>> ReadEvents(int lastReadSlice)
         {
             List<object> eventsInStore = new List<object>();
-            if (!await CreateStreamIfNotExists())
-                return eventsInStore;
+            await CreateStreamIfNotExists();
 
-            StreamSlice<EventEntity> slice;
-            var nextSliceStart = lastReadSlice + 1;
-            do
+            if (lastReadSlice > 0)
             {
-                slice = await Stream.ReadAsync<EventEntity>(partition, nextSliceStart);
+                try
+                {
+                    StreamSlice<EventEntity> slice;
+                    var nextSliceStart = lastReadSlice + 1;
+                    do
+                    {
+                        slice = await Stream.ReadAsync<EventEntity>(partition, nextSliceStart);
 
-                nextSliceStart = slice.HasEvents
-                    ? slice.Events.Last().Version + 1
-                    : -1;
+                        nextSliceStart = slice.HasEvents
+                            ? slice.Events.Last().Version + 1
+                            : -1;
 
-                eventsInStore.AddRange(slice.Events.Select(DeserializeEvent));
+                        eventsInStore.AddRange(slice.Events.Select(DeserializeEvent));
+                    }
+                    while (!slice.IsEndOfStream);
+                }
+                catch (Exception e)
+                {
+                    throw e;
+                }
             }
-            while (!slice.IsEndOfStream);
             return eventsInStore;
         }
 
-        public async Task<SnapshotData> ReadSnapshot(int ver=0)
+        public async Task<SnapshotData> ReadSnapshot(int snapshotVersion=0)
         {
             await CreateStreamIfNotExists();
-            if (ver == 0)
+            if (snapshotVersion == 0)
             {
                 int highestVersion = stream.Version;
-                ver = highestVersion;
+                snapshotVersion = highestVersion;
             }
-                
+            log.Information("Reading snapshot version {SnapshotVersion}",snapshotVersion);
             StreamSlice<EventEntity> slice;
-            if (ver > 0)
+            if (snapshotVersion > 0)
             {
-                slice = await Stream.ReadAsync<EventEntity>(partition, ver, 1);
+                slice = await Stream.ReadAsync<EventEntity>(partition, snapshotVersion, 1);
                 return JsonConvert.DeserializeObject<SnapshotData>(slice.Events.Last().Data, serializerSettings);
             }
             else
             {
-                throw new Exception("No snapshot found!");
+                string errorMsg = String.Format("Cannot read snapshot, none exists!");
+                log.Error(errorMsg);
+                throw new Exception(errorMsg);
             }
 
 
@@ -163,10 +177,6 @@ namespace AzureBlobStorage
         object DeserializeEvent(EventEntity @event)
         {
             var eventType = Type.GetType(@event.Type, true);
-
-            //Debug.Assert(eventType != null,
-            //    "Couldn't load type '{0}'. Are you missing an assembly reference?", @event.Type);
-
             return JsonConvert.DeserializeObject(@event.Data, eventType, serializerSettings);
         }
 

@@ -12,6 +12,8 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using ServiceCode;
+using Serilog;
+using Seq;
 using ServiceInterface;
 
 namespace WebApiO
@@ -72,8 +74,14 @@ namespace WebApiO
                     options.ServiceId = "SmartCache";
                 })
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomain).Assembly).WithReferences())
+                //.ConfigureLogging(logging => logging.)
                 .UseOrleankka()
                 .Build();
+
+            var log = new LoggerConfiguration()
+            .WriteTo.Seq("http://localhost:5341")
+            .WriteTo.Console()
+            .CreateLogger();
 
             await client.Connect(RetryFilter);
             return client.ActorSystem();

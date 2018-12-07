@@ -1,9 +1,11 @@
 ﻿using System.Globalization;
 using System.Threading.Tasks;
+using Microsoft.Extensions.Options;
 using Microsoft.WindowsAzure.Storage;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
+using Serilog;
 
 namespace AzureBlobStorage
 {
@@ -17,6 +19,7 @@ namespace AzureBlobStorage
         private JsonSerializerSettings jsonSerializerSettings;
         private CloudStorageAccount cloudStorageAccount;
         private CloudTable cloudTable;
+        private ILogger log;
 
         static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings()
         {
@@ -33,24 +36,33 @@ namespace AzureBlobStorage
             Formatting = Formatting.None
         };
 
-        public EventTableStore(string AzureConnectionString, string TableName)
+        public EventTableStore(IOptions<EventTableStoreSettings> settings, JsonSerializerSettings JsonSerializerSettings = null)
         {
-            cloudStorageAccount = CloudStorageAccount.Parse(AzureConnectionString);
-            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(TableName);
-            jsonSerializerSettings = SerializerSettings;
-        }
-
-        public EventTableStore(string AzureConnectionString, string TableName, JsonSerializerSettings JsonSerializerSettings)
-        {
-            cloudStorageAccount = CloudStorageAccount.Parse(AzureConnectionString);
-            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(TableName);
+            cloudStorageAccount = CloudStorageAccount.Parse(settings.Value.AzureConnectionString);
+            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(settings.Value.TableName);
             jsonSerializerSettings = JsonSerializerSettings;
+            log = null;
+
+            if (JsonSerializerSettings == null)
+                jsonSerializerSettings = JsonSerializerSettings;
         }
 
+        public EventTableStore(IOptions<EventTableStoreSettings> settings, ILogger Log, JsonSerializerSettings JsonSerializerSettings = null)
+        {
+            cloudStorageAccount = CloudStorageAccount.Parse(settings.Value.AzureConnectionString);
+            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(settings.Value.TableName);
+            jsonSerializerSettings = JsonSerializerSettings;
+            log = Log;
+
+            if (JsonSerializerSettings == null)
+                jsonSerializerSettings = JsonSerializerSettings;
+        }
+
+        
         public async Task<EventTableStoreStream> ProvisonEventStream(string actorId)
         {
             await cloudTable.CreateIfNotExistsAsync();
-            return new EventTableStoreStream(cloudTable, actorId, jsonSerializerSettings);
+            return new EventTableStoreStream(cloudTable, actorId, jsonSerializerSettings,log);
         }
     }
 }

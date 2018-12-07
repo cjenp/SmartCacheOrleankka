@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System.Linq;
 using AzureBlobStorage;
 using CacheGrainInter;
+using Serilog;
+using Serilog.Context;
 
 namespace CacheGrainImpl
 {
@@ -23,44 +25,51 @@ namespace CacheGrainImpl
         int version = 0;
         int eventsPerSnapshot = 3;
 
-        public EventSourcedActor(ISnapshotStore SnapshotStore, IEventTableStore EventTableStore, string id = null, IActorRuntime runtime= null, Dispatcher dispatcher= null):base(id, runtime,dispatcher)
+        protected ILogger log;
+
+        public EventSourcedActor(ISnapshotStore SnapshotStore, IEventTableStore EventTableStore, ILogger Log, string id = null, IActorRuntime runtime= null, Dispatcher dispatcher= null):base(id, runtime,dispatcher)
         {
             snapshotStore = SnapshotStore;
             eventTableStore = EventTableStore;
+            log = Log.ForContext<EventSourcedActor<T>>();
         }
 
         public override async Task<object> Receive(object message)
         {
-            switch (message)
+            using (LogContext.PushProperty("GranID", Id))
             {
-                case Activate _:
-                    state = Activator.CreateInstance<T>();
-                    await CreateStorageStreams();
-                    await LoadSnapshot();
-                    await Load();
-                    return Done;
+                switch (message)
+                {
+                    case Activate _:
+                        log.Information("Grain activated");
+                        state = Activator.CreateInstance<T>();
+                        await CreateStorageStreams();
+                        await LoadSnapshot();
+                        await Load();
+                        return Done;
 
-                case Command cmd:
-                    return await HandleCommand(cmd);
+                    case Command cmd:
+                        return await HandleCommand(cmd);
 
-                case Query query:
-                    return await HandleQuery(query);
+                    case Query query:
+                        return await HandleQuery(query);
 
-                default:
-                    return await base.Receive(message);
+                    default:
+                        return await base.Receive(message);
+                }
             }
         }
 
         public async Task CreateStorageStreams()
-        { 
-            snapshotBlobStream = await snapshotStore.ProvisonSnapshotStream(SnapshotStreamName());        
+        {
+            snapshotBlobStream = await snapshotStore.ProvisonSnapshotStream(SnapshotStreamName());
             eventTableStoreStream = await eventTableStore.ProvisonEventStream(StreamName());
         }        
 
         public async Task LoadSnapshot()
         {
-            if(snapshotBlobStream.Version() > 0)
-            { 
+            if(await snapshotBlobStream.Version() > 0)
+            {
                 var lastSnapshot= await snapshotBlobStream.ReadSnapshot();         
                 version = lastSnapshot.EventsInSNapshot;
                 state = snapshotBlobStream.ReadSnapshotFromUri<T>(lastSnapshot.SnapshotUri);
@@ -71,7 +80,9 @@ namespace CacheGrainImpl
         {
             var eventsRead = await eventTableStoreStream.ReadEvents(version);
             version += eventsRead.Count();
+            log.Information("Reading {NumberOfEvents} events", eventsRead.Count());
             Apply(eventsRead);
+
         }
 
         void Apply(IEnumerable<object> events)
@@ -89,6 +100,7 @@ namespace CacheGrainImpl
 
             foreach (var @event in events)
             {
+                log.Information("Handling event \"{EventType}\"", @event.GetType());
                 Dispatcher.Dispatch(this, @event);
                 version++;
                 if (version % eventsPerSnapshot == 0)

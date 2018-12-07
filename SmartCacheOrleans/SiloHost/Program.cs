@@ -4,13 +4,18 @@ using System.Threading.Tasks;
 using Orleans;
 using Orleans.Configuration;
 using Orleans.Hosting;
-using Microsoft.Extensions.Logging;
-using Microsoft.WindowsAzure.Storage;
 using Orleankka.Cluster;
 using Microsoft.Extensions.DependencyInjection;
 using AzureBlobStorage;
 using Newtonsoft.Json;
 using System.Globalization;
+using Serilog;
+using Serilog.Events;
+using ILogger = Serilog.ILogger;
+using Serilog.Configuration;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Configuration;
+using System.IO;
 
 namespace SiloHost
 {
@@ -31,10 +36,8 @@ namespace SiloHost
             Formatting = Formatting.None
         };
 
-        private static CloudStorageAccount csAccount;
         public static int Main(string[] args)
         {
-            csAccount = CloudStorageAccount.DevelopmentStorageAccount;
             return RunMainAsync().Result;
         }
 
@@ -42,9 +45,18 @@ namespace SiloHost
         {
             try
             {
-                var host = await StartSilo();
+                var log = new LoggerConfiguration()
+                            .WriteTo.Seq("http://localhost:5341")
+                            .WriteTo.Console()
+                            .Enrich.FromLogContext()
+                            .CreateLogger();
 
-                Console.WriteLine("Silo started, press Enter to stop.");
+                
+
+
+                var host = await StartSilo(log);
+
+                log.Information("Silo started");
                 Console.ReadLine();
 
                 await host.StopAsync();
@@ -58,8 +70,17 @@ namespace SiloHost
             }
         }
 
-        private static async Task<ISiloHost> StartSilo()
+        private static async Task<ISiloHost> StartSilo(ILogger log)
         {
+            var configurationBuilder = new ConfigurationBuilder()
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+            var xs = Directory.GetCurrentDirectory();
+            var Configuration = configurationBuilder.Build();
+
+
+            var x = Configuration.GetSection(nameof(SnapshotBlobStoreSettings)).GetChildren();
+            var y = Configuration.GetSection(nameof(EventTableStoreSettings)).GetChildren();
             // silo config
             var builder = new SiloHostBuilder()
                 .UseLocalhostClustering()
@@ -70,9 +91,22 @@ namespace SiloHost
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
-                .ConfigureLogging(logging => logging.AddConsole())
-                .ConfigureServices(d=>d.AddSingleton<ISnapshotStore>(new SnapshotBlobStore("UseDevelopmentStorage=true", "orleankka","orleankkatable", SerializerSettings)))
-                .ConfigureServices(d => d.AddSingleton<IEventTableStore>(new EventTableStore("UseDevelopmentStorage=true", "events", SerializerSettings)))
+                .ConfigureLogging(logging => logging.AddSeq())
+                .ConfigureServices(d => d.AddSingleton<ILogger>(log))
+
+                .Configure<SnapshotBlobStoreSettings>(Configuration.GetSection(nameof(SnapshotBlobStoreSettings)))
+                .Configure<EventTableStoreSettings>(
+                    options =>
+                    {
+                        options.AzureConnectionString = "UseDevelopmentStorage=true";
+                        options.TableName = "tableName";
+                    }
+                )
+
+                .ConfigureServices(d => d.AddSingleton<SnapshotBlobStore>())
+                .ConfigureServices(d => d.AddSingleton<ISnapshotStore>(s=>s.GetService<SnapshotBlobStore>()))
+                .ConfigureServices(d => d.AddSingleton<EventTableStore>())
+                .ConfigureServices(d => d.AddSingleton<IEventTableStore>(s => s.GetService<EventTableStore>()))
                 .UseInMemoryReminderService()
                 .UseOrleankka();
 

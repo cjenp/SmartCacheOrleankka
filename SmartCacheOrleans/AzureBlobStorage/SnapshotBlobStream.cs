@@ -1,6 +1,8 @@
 ﻿using CacheGrainInter;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
+using Serilog;
+using Serilog.Context;
 using System;
 using System.IO;
 using System.Net;
@@ -20,17 +22,20 @@ namespace AzureBlobStorage
         private JsonSerializerSettings jSSettings;
         private String idActor;
         private EventTableStoreStream eventTableStoreStream;
+        private ILogger log;
 
-        public SnapshotBlobStream(String IdActor, CloudBlobContainer BlobContainer, JsonSerializerSettings jsonSerializerSettings, EventTableStoreStream EventTableStoreStream)
+        public SnapshotBlobStream(String IdActor, CloudBlobContainer BlobContainer, JsonSerializerSettings jsonSerializerSettings, EventTableStoreStream EventTableStoreStream, ILogger Log)
         {
             blobContainer = BlobContainer;
             idActor = IdActor;
             jSSettings = jsonSerializerSettings;
             eventTableStoreStream = EventTableStoreStream;
+            log = Log.ForContext<SnapshotBlobStream>();
         }
 
         public async Task WriteSnapshot(Object snapshot, int eventCount)
         {
+            log.Information("Storing snapshot with {EventCount} events", eventCount);
             CloudBlockBlob blob = blobContainer.GetBlockBlobReference(String.Format("{0}/Snapshot_{1}", idActor, eventCount));
             string data = JsonConvert.SerializeObject(snapshot);
             using (var stream = new MemoryStream(Encoding.Default.GetBytes(data), false))
@@ -41,9 +46,9 @@ namespace AzureBlobStorage
             await eventTableStoreStream.StoreSnapshot(uri, eventCount);
         }
 
-        public int Version()
+        public async Task<int> Version()
         {
-            return eventTableStoreStream.Version;
+            return await eventTableStoreStream.GetVersion();
         }
 
         public async Task<SnapshotData> ReadSnapshot(int ver=0)
@@ -53,6 +58,7 @@ namespace AzureBlobStorage
 
         public T ReadSnapshotFromUri<T>(String uri)
         {
+            log.Information("Reading snasphot from uri {SnapshotUri}",uri);
             var webRequest = WebRequest.Create(uri);
             string strContent = String.Empty;
 

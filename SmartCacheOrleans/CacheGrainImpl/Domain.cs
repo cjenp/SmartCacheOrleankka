@@ -5,6 +5,7 @@ using CacheGrainInter;
 using Orleankka;
 using Orleankka.Meta;
 using Orleans;
+using Serilog;
 
 namespace CacheGrainImpl
 {
@@ -16,7 +17,7 @@ namespace CacheGrainImpl
 
     public class Domain : EventSourcedActor<DomainState>, IDomain
     {
-        public Domain(ISnapshotStore snapshotStore, IEventTableStore eventTableStore, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(snapshotStore,eventTableStore, id, runtime, dispatcher)
+        public Domain(ISnapshotStore snapshotStore, IEventTableStore eventTableStore,ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(snapshotStore,eventTableStore,log, id, runtime, dispatcher)
         {
         }
 
