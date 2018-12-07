@@ -124,6 +124,7 @@ namespace AzureBlobStorage
                 }
                 catch (Exception e)
                 {
+                    log.Error(e, "Exception occured while reading events");
                     throw e;
                 }
             }
@@ -140,19 +141,25 @@ namespace AzureBlobStorage
             }
             log.Information("Reading snapshot version {SnapshotVersion}",snapshotVersion);
             StreamSlice<EventEntity> slice;
-            if (snapshotVersion > 0)
+            try
             {
-                slice = await Stream.ReadAsync<EventEntity>(partition, snapshotVersion, 1);
-                return JsonConvert.DeserializeObject<SnapshotData>(slice.Events.Last().Data, serializerSettings);
+                if (snapshotVersion > 0)
+                {
+                    slice = await Stream.ReadAsync<EventEntity>(partition, snapshotVersion, 1);
+                    return JsonConvert.DeserializeObject<SnapshotData>(slice.Events.Last().Data, serializerSettings);
+                }
+                else
+                {
+                    string errorMsg = String.Format("Cannot read snapshot, none exists!");
+                    log.Error(errorMsg);
+                    throw new Exception(errorMsg);
+                }
             }
-            else
+            catch (Exception e)
             {
-                string errorMsg = String.Format("Cannot read snapshot, none exists!");
-                log.Error(errorMsg);
-                throw new Exception(errorMsg);
+                log.Error(e, "Exception occured while reading snapshot version {SnapshotVersion}", snapshotVersion);
+                throw e;
             }
-
-
         }
 
         private EventData[] ToEventData(Event[] events)

@@ -38,9 +38,17 @@ namespace AzureBlobStorage
             log.Information("Storing snapshot with {EventCount} events", eventCount);
             CloudBlockBlob blob = blobContainer.GetBlockBlobReference(String.Format("{0}/Snapshot_{1}", idActor, eventCount));
             string data = JsonConvert.SerializeObject(snapshot);
-            using (var stream = new MemoryStream(Encoding.Default.GetBytes(data), false))
+            try
             {
-                await blob.UploadFromStreamAsync(stream);
+                using (var stream = new MemoryStream(Encoding.Default.GetBytes(data), false))
+                {
+                    await blob.UploadFromStreamAsync(stream);
+                }
+            }
+            catch(Exception e)
+            {
+                log.Error(e, "Exception occured while writing snasphot to Blob store");
+                throw e;
             }
             var uri=blob.Uri.AbsoluteUri;
             await eventTableStoreStream.StoreSnapshot(uri, eventCount);
@@ -62,12 +70,21 @@ namespace AzureBlobStorage
             var webRequest = WebRequest.Create(uri);
             string strContent = String.Empty;
 
-            using (var response = webRequest.GetResponse())
-            using (var content = response.GetResponseStream())
-            using (var reader = new StreamReader(content))
+            try
             {
-                strContent = reader.ReadToEnd();
+                using (var response = webRequest.GetResponse())
+                using (var content = response.GetResponseStream())
+                using (var reader = new StreamReader(content))
+                {
+                    strContent = reader.ReadToEnd();
+                }
             }
+            catch(Exception e)
+            {
+                log.Error(e, "Exception occured while reading snasphot from uri");
+                throw e;
+            }
+            
             return JsonConvert.DeserializeObject<T>(strContent, jSSettings);
         }
     }
