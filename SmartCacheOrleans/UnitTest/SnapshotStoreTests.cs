@@ -1,10 +1,18 @@
 ﻿using AzureBlobStorage;
+using CacheGrainInter;
 using FluentAssertions;
 using Microsoft.WindowsAzure.Storage;
+using Microsoft.WindowsAzure.Storage.Blob;
+using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
+using Orleankka.Meta;
+using Serilog;
+using Streamstone;
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading.Tasks;
 using Xunit;
 
 namespace UnitTests
@@ -26,44 +34,92 @@ namespace UnitTests
             Formatting = Formatting.None
         };
 
-        [Fact]
-        public void WriteSnapshotTest()
+        [Theory]
+        [InlineData("Stake1",5)]
+        [InlineData("State1dsfsdfg", 12)]
+        public async Task WriteAndReadSnapshot(String fakeState,int eventsInSnapshot)
         {
-            /*
-            BreachedEmailStore bs = new BreachedEmailStore(CloudStorageAccount.DevelopmentStorageAccount, SerializerSettings,"UnitTest1","UnitTestTable");
-            String testObj = "Test123";
-            var snasphotStream=await bs.ProvisonSnapshotStream(blobFolderName);
-            String s=await snasphotStream.WriteSnapshot(testObj, version);
+            var log = new LoggerConfiguration().CreateLogger();
+            CloudStorageAccount cloudStorageAccount = CloudStorageAccount.Parse("UseDevelopmentStorage=true");
+            CloudTable cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference("unitTestTable");
+            var blobClient = cloudStorageAccount.CreateCloudBlobClient();
+            await cloudTable.DeleteIfExistsAsync();
+            await cloudTable.CreateIfNotExistsAsync();
 
-            s.Should().MatchRegex(String.Format("^http://127\\.0\\.0\\.1:10000/devstoreaccount1/{0}/SNAPSHOT_{1}$", blobFolderName, version));*/
+            var blobContainer = blobClient.GetContainerReference("testing");
+            await blobContainer.DeleteIfExistsAsync();
+            await blobContainer.CreateIfNotExistsAsync();
+            await blobContainer.SetPermissionsAsync(new BlobContainerPermissions { PublicAccess = BlobContainerPublicAccessType.Container });
+
+            String streamName = "teststream";
+            Partition partition = new Partition(cloudTable, streamName);
+            Stream stream = new Stream(partition);
+
+            EventTableStoreStream eventTableStoreStream = new EventTableStoreStream(partition,stream, streamName, SerializerSettings);
+            SnapshotBlobStream snapshotBlobStream = new SnapshotBlobStream("snapshot.test",blobContainer,SerializerSettings,eventTableStoreStream);
+
+
+            await snapshotBlobStream.WriteSnapshot(fakeState, eventsInSnapshot);
+            var snapshotData=await snapshotBlobStream.ReadSnapshot();
+            String readState = snapshotBlobStream.ReadSnapshotFromUri<String>(snapshotData.SnapshotUri);
+
+            snapshotData.EventsInSNapshot.Should().Be(eventsInSnapshot);
+            readState.Should().BeEquivalentTo(fakeState);
         }
 
-        [Fact]
-        public void WriteAndReadSnapshotTest()
+
+
+        [Theory]
+        [MemberData(nameof(TestDataEvents))]
+        public async Task WriteAndReadEvents(Event[] events)
         {
-            /*
-            BreachedEmailStore bs = new BreachedEmailStore();
-            HashSet<String> testStateStrings=new HashSet<string>();
-            testStateStrings.Add("String1");
-            testStateStrings.Add("String2");
-            testStateStrings.Add("String3");
-            testStateStrings.Add("String4");
-            testStateStrings.Add("String5");
-            var ss = await bs.ProvisonSnapshotStream("emailsi");
+            var log = new LoggerConfiguration().CreateLogger();
+            CloudStorageAccount cloudStorageAccount = CloudStorageAccount.Parse("UseDevelopmentStorage=true");
+            CloudTable cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference("unitTestTable");
+            await cloudTable.DeleteIfExistsAsync();
+            await cloudTable.CreateIfNotExistsAsync();
 
-            String s = await ss.WriteSnapshot(testStateStrings,1);
-            HashSet<String> snap=ss.ReadSnapshotFromUri<HashSet<String>>(s);
-            testStateStrings.Should().BeEquivalentTo(snap);
+            String streamName = "teststream";
+            Partition partition = new Partition(cloudTable, streamName);
+            Stream stream = new Stream(partition);
+            //var events = new Event[] { new DomainAddedEmail("3@domena1.com"), new DomainAddedEmail("2@domena1.com") , new DomainAddedEmail("1@domena1.com") };
+            EventTableStoreStream eventTableStoreStream = new EventTableStoreStream(partition,stream,"teststream",SerializerSettings);
+
+            await eventTableStoreStream.StoreEvents(events);
+            //var eventsReturned=await eventTableStoreStream.ReadEvents(0);
+            int ver = eventTableStoreStream.Version;
+
+            //eventsReturned.Should().BeEquivalentTo(events);
+            ver.Should().Be(events.Length);
+
+        }
 
 
-            var ss2 = await bs.ProvisonSnapshotStream("domenasi");
-            List<DateTime> testStateDates = new List<DateTime>();
-            testStateDates.Add(DateTime.Now);
-            testStateDates.Add(new DateTime());
+        public static IEnumerable<object[]> TestDataEvents()
+        {
+            var testcase = new Event[]
+            {
+                new DomainAddedEmail("1@domena1.com"),
+                new DomainAddedEmail("2@domena1.com")
+            };
+            yield return new object[] { testcase };
 
-            s = ss2.WriteSnapshot(testStateDates,1).GetAwaiter().GetResult();
-            List<DateTime> snapDate = ss2.ReadSnapshotFromUri< List<DateTime> > (s);
-            testStateDates.Should().BeEquivalentTo(snapDate);*/
+            var testcase2 = new Event[]
+            {
+                new DomainAddedEmail("1@email.com"),
+                new DomainAddedEmail("2@domena1.com"),
+                new DomainAddedEmail("3@domena1.com"),
+                new DomainAddedEmail("4@domena1.com"),
+                new DomainAddedEmail("5@domena1.com")
+            };
+            yield return new object[] { testcase };
+
+            var testcase3 = new Event[]
+            {
+                new DomainAddedEmail("1@domena1.com"),
+                new DomainAddedEmail("2@domena1.com")
+            };
+            yield return new object[] { testcase };
         }
     }
 }

@@ -6,6 +6,7 @@ using Microsoft.WindowsAzure.Storage.Blob;
 using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Serilog;
+using Streamstone;
 
 namespace AzureBlobStorage
 {
@@ -17,7 +18,6 @@ namespace AzureBlobStorage
         private CloudBlobClient blobClient;
         private CloudBlobContainer blobContainer;
         private string containerName;
-        private ILogger log;
 
         static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
         {
@@ -54,19 +54,6 @@ namespace AzureBlobStorage
             if (JsonSerializerSettings == null)
                 jsonSerializerSettings = JsonSerializerSettings;
         }
-        
-        public SnapshotBlobStore(IOptions<SnapshotBlobStoreSettings> settings,ILogger Log, JsonSerializerSettings JsonSerializerSettings = null)
-        {
-            cloudStorageAccount = CloudStorageAccount.Parse(settings.Value.AzureConnectionString);
-            blobClient = cloudStorageAccount.CreateCloudBlobClient();
-            cloudTable = cloudStorageAccount.CreateCloudTableClient().GetTableReference(settings.Value.TableName);
-            jsonSerializerSettings = JsonSerializerSettings;
-            containerName = settings.Value.ContainerName;
-            log = Log;
-
-            if(JsonSerializerSettings == null)
-                jsonSerializerSettings = JsonSerializerSettings;
-        }
 
         public async Task<SnapshotBlobStream> ProvisonSnapshotStream(string actorId)
         {
@@ -75,7 +62,9 @@ namespace AzureBlobStorage
             await blobContainer.CreateIfNotExistsAsync();
             await blobContainer.SetPermissionsAsync(new BlobContainerPermissions { PublicAccess = BlobContainerPublicAccessType.Container });
 
-            return new SnapshotBlobStream(actorId, blobContainer, SerializerSettings, new EventTableStoreStream(cloudTable, actorId, jsonSerializerSettings,log),log);
+            Partition partition = new Partition(cloudTable, actorId);
+            Stream stream = new Stream(partition);
+            return new SnapshotBlobStream(actorId, blobContainer, SerializerSettings, new EventTableStoreStream(partition,stream, actorId, jsonSerializerSettings));
         }
     }
 }

@@ -22,20 +22,17 @@ namespace AzureBlobStorage
         private JsonSerializerSettings jSSettings;
         private String idActor;
         private EventTableStoreStream eventTableStoreStream;
-        private ILogger log;
 
-        public SnapshotBlobStream(String IdActor, CloudBlobContainer BlobContainer, JsonSerializerSettings jsonSerializerSettings, EventTableStoreStream EventTableStoreStream, ILogger Log)
+        public SnapshotBlobStream(String IdActor, CloudBlobContainer BlobContainer, JsonSerializerSettings jsonSerializerSettings, EventTableStoreStream EventTableStoreStream)
         {
             blobContainer = BlobContainer;
             idActor = IdActor;
             jSSettings = jsonSerializerSettings;
             eventTableStoreStream = EventTableStoreStream;
-            log = Log.ForContext<SnapshotBlobStream>();
         }
 
         public async Task WriteSnapshot(Object snapshot, int eventCount)
         {
-            log.Information("Storing snapshot with {EventCount} events", eventCount);
             CloudBlockBlob blob = blobContainer.GetBlockBlobReference(String.Format("{0}/Snapshot_{1}", idActor, eventCount));
             string data = JsonConvert.SerializeObject(snapshot);
             try
@@ -47,16 +44,15 @@ namespace AzureBlobStorage
             }
             catch(Exception e)
             {
-                log.Error(e, "Exception occured while writing snasphot to Blob store");
-                throw e;
+                throw new SnapshotBlobStreamException("Exception occured while writing snasphot to Blob store", e);
             }
             var uri=blob.Uri.AbsoluteUri;
             await eventTableStoreStream.StoreSnapshot(uri, eventCount);
         }
 
-        public async Task<int> Version()
+        public int Version()
         {
-            return await eventTableStoreStream.GetVersion();
+            return eventTableStoreStream.Version;
         }
 
         public async Task<SnapshotData> ReadSnapshot(int ver=0)
@@ -66,7 +62,6 @@ namespace AzureBlobStorage
 
         public T ReadSnapshotFromUri<T>(String uri)
         {
-            log.Information("Reading snasphot from uri {SnapshotUri}",uri);
             var webRequest = WebRequest.Create(uri);
             string strContent = String.Empty;
 
@@ -81,8 +76,7 @@ namespace AzureBlobStorage
             }
             catch(Exception e)
             {
-                log.Error(e, "Exception occured while reading snasphot from uri");
-                throw e;
+                throw new SnapshotBlobStreamException("Exception occured while reading snasphot from uri", e);
             }
             
             return JsonConvert.DeserializeObject<T>(strContent, jSSettings);
