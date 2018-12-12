@@ -20,12 +20,13 @@ namespace CacheGrainImpl
         IEventTableStore eventTableStore;
         EventTableStoreStream eventTableStoreStream;
 
+        StreamRef streamProjectionAggregate;
+        StreamRef streamProjectionDomain;
+
         int version = 0;
         int eventsPerSnapshot = 3;
 
         protected ILogger log;
-
-        StreamRef stream;
 
         public EventSourcedActor(ISnapshotStore SnapshotStore, IEventTableStore EventTableStore, ILogger<T> log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
         {
@@ -48,7 +49,7 @@ namespace CacheGrainImpl
                 switch (message)
                 {
                     case Activate _:
-                        await CreateStorageStreams();
+                        await CreateStorageAndProjectionStreams();
                         await LoadSnapshot();
                         await Load();
                         log.LogInformation("Grain activated");
@@ -69,8 +70,11 @@ namespace CacheGrainImpl
             }
         }
 
-        public async Task CreateStorageStreams()
+        public async Task CreateStorageAndProjectionStreams()
         {
+            streamProjectionAggregate = System.StreamOf("SMSProvider", $"{Self.Path.Interface}");
+            streamProjectionDomain = System.StreamOf("SMSProvider", $"{Self.Path}");
+
             snapshotBlobStream = await snapshotStore.ProvisonSnapshotStream(SnapshotStreamName());
             eventTableStoreStream = await eventTableStore.ProvisonEventStream(StreamName());
         }
@@ -119,8 +123,24 @@ namespace CacheGrainImpl
             {
                 await snapshotBlobStream.WriteSnapshot(state, version);
             }
-
+            await Project(events);
             return events;
+        }
+
+        async Task Project(IEnumerable<Event> events)
+        {
+            foreach (var @event in events)
+            {
+                var envelope = Wrap(@event);
+                await streamProjectionAggregate.Push(envelope);
+                await streamProjectionDomain.Push(envelope);
+            }
+        }
+
+        object Wrap(Event @event)
+        {
+            var envelopeType = typeof(EventEnvelope<>).MakeGenericType(@event.GetType());
+            return Activator.CreateInstance(envelopeType, Id, @event);
         }
 
         string StreamName()
@@ -131,6 +151,19 @@ namespace CacheGrainImpl
         string SnapshotStreamName()
         {
             return GetType().Name + "-" + Id + "-" + "Snapshot";
+        }
+    }
+
+    public abstract class StreamProjectionActor : DispatchActorGrain
+    {
+        public override async Task OnActivateAsync()
+        {
+            await base.OnActivateAsync();
+            var streamProvider = GetStreamProvider("SMSProvider");
+            var stream = streamProvider.GetStream<object>(Guid.Empty, Id);
+            await stream.SubscribeAsync(async (data, token) =>
+                await Dispatcher.DispatchAsync(this, data)
+            );
         }
     }
 }

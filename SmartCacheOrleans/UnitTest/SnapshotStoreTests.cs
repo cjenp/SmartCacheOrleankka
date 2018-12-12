@@ -99,25 +99,25 @@ namespace UnitTests
         {
             var testcase = new Event[]
             {
-                new DomainAddedEmail("1@domena1.com"),
-                new DomainAddedEmail("2@domena1.com")
+                new AddedEmailToDomain("1@domena1.com"),
+                new AddedEmailToDomain("2@domena1.com")
             };
             yield return new object[] { testcase };
 
             var testcase2 = new Event[]
             {
-                new DomainAddedEmail("1@email.com"),
-                new DomainAddedEmail("2@domena1.com"),
-                new DomainAddedEmail("3@domena1.com"),
-                new DomainAddedEmail("4@domena1.com"),
-                new DomainAddedEmail("5@domena1.com")
+                new AddedEmailToDomain("1@email.com"),
+                new AddedEmailToDomain("2@domena1.com"),
+                new AddedEmailToDomain("3@domena1.com"),
+                new AddedEmailToDomain("4@domena1.com"),
+                new AddedEmailToDomain("5@domena1.com")
             };
             yield return new object[] { testcase };
 
             var testcase3 = new Event[]
             {
-                new DomainAddedEmail("1@domena1.com"),
-                new DomainAddedEmail("2@domena1.com")
+                new AddedEmailToDomain("1@domena1.com"),
+                new AddedEmailToDomain("2@domena1.com")
             };
             yield return new object[] { testcase };
         }

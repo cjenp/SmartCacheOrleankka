@@ -10,16 +10,10 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleankka.Client;
 using Orleans;
 using Orleans.Configuration;
-using Orleans.Runtime;
 using ServiceCode;
 using Serilog;
-using Seq;
 using ServiceInterface;
 using Orleans.Hosting;
-using Orleans.ApplicationParts;
-using Orleans.Storage;
-using Orleankka;
-using Orleans.Providers.Streams.SimpleMessageStream;
 
 namespace WebApiO
 {

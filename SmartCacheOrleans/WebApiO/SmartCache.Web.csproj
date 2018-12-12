@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CacheGrainImpl\SmartCache.GrainCode.csproj" />
     <ProjectReference Include="..\CacheGrainInter\SmartCache.SharedCode.csproj" />
     <ProjectReference Include="..\ServiceCode\SmartCache.ServiceCode.csproj" />
     <ProjectReference Include="..\ServiceInterface\SmartCache.ServiceInterface.csproj" />

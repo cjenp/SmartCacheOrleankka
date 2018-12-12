@@ -28,13 +28,30 @@ namespace CacheGrainInter
     }
 
     [Serializable]
-    public class DomainAddedEmail : Event
+    public class GetDomainsInfo : Query<Dictionary<String,int>>
+    {}
+
+    [Serializable]
+    public class AddedEmailToDomain : Event
     {
         public readonly string Email;
 
-        public DomainAddedEmail(string email)
+        public AddedEmailToDomain(string email)
         {
             Email = email;
+        }
+    }
+
+    [Serializable]
+    public class EventEnvelope<T> where T : Event
+    {
+        public readonly string StreamId;
+        public readonly T Event;
+
+        public EventEnvelope(string stream, T @event)
+        {
+            StreamId = stream;
+            Event = @event;
         }
     }
 

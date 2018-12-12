@@ -86,9 +86,6 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddSerilog(log).Services.AddSingleton(log))
-                
-           //     .ConfigureServices(d => d.AddSingleton<ILogger>(log))
-
                 .Configure<SnapshotBlobStoreSettings>(Configuration.GetSection(nameof(SnapshotBlobStoreSettings)))
                 .Configure<EventTableStoreSettings>(
                     options =>
@@ -97,7 +94,6 @@ namespace SiloHost
                         options.TableName = "tableName";
                     }
                 )
-
                 .ConfigureServices(d => d.AddSingleton<SnapshotBlobStore>())
                 .ConfigureServices(d => d.AddSingleton<ISnapshotStore>(s=>s.GetService<SnapshotBlobStore>()))
                 .ConfigureServices(d => d.AddSingleton<EventTableStore>())
