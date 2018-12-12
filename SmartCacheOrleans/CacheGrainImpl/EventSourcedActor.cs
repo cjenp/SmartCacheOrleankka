@@ -5,8 +5,9 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Linq;
 using AzureBlobStorage;
-using Serilog;
-using Serilog.Context;
+using Microsoft.Extensions.Logging;
+using CacheGrainInter;
+using Orleans.Streams;
 
 namespace CacheGrainImpl
 {
@@ -24,25 +25,33 @@ namespace CacheGrainImpl
 
         protected ILogger log;
 
-        public EventSourcedActor(ISnapshotStore SnapshotStore, IEventTableStore EventTableStore, ILogger Log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
+        StreamRef stream;
+
+        public EventSourcedActor(ISnapshotStore SnapshotStore, IEventTableStore EventTableStore, ILogger<T> log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
         {
             snapshotStore = SnapshotStore;
             eventTableStore = EventTableStore;
-            log = Log.ForContext<EventSourcedActor<T>>();
+            this.log = log;
         }
 
         public override async Task<object> Receive(object message)
         {
-            using (LogContext.PushProperty("GranID", Id))
+
+            var dic = new Dictionary<string, object>()
             {
+                ["ActorId"] = Self.Path.Id,
+            };
+
+            using (log.BeginScope(dic))
+            {
+
                 switch (message)
                 {
                     case Activate _:
                         await CreateStorageStreams();
                         await LoadSnapshot();
                         await Load();
-
-                        log.Information("Grain activated");
+                        log.LogInformation("Grain activated");
                         return Done;
 
                     case LifecycleMessage lm:
@@ -82,7 +91,7 @@ namespace CacheGrainImpl
         {
             var eventsRead = await eventTableStoreStream.ReadEvents(Apply, version);
             version += eventsRead;
-            log.Information("Read {NumberOfEvents} events", eventsRead);
+            log.LogInformation("Read {NumberOfEvents} events", eventsRead);
         }
 
         void Apply(IEnumerable<Event> events)
@@ -93,13 +102,14 @@ namespace CacheGrainImpl
 
         Task<object> HandleQuery(Query query)
         {
-            log.Information("Handling query {@Query}", query);
+            log.LogInformation("Handling query {@Query}", query);
             return Result(Dispatcher.DispatchResult(this, query));
         }
 
         async Task<object> HandleCommand(Command cmd)
         {
-            log.Information("Handling command {@Command}", cmd);
+            
+            log.LogInformation("Handling command {@Command}", cmd);
             var events = Dispatcher.DispatchResult<IEnumerable<Event>>(this, cmd).ToArray();
             await eventTableStoreStream.StoreEvents(events);
 
@@ -112,7 +122,6 @@ namespace CacheGrainImpl
 
             return events;
         }
-
 
         string StreamName()
         {

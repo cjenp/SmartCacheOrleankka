@@ -4,20 +4,18 @@ using AzureBlobStorage;
 using CacheGrainInter;
 using Orleankka;
 using Orleankka.Meta;
-using Orleans;
-using Serilog;
-
+using Microsoft.Extensions.Logging;
 namespace CacheGrainImpl
 {
 
-    public  class DomainState
+    public class DomainState
     {
         public HashSet<string> Emails = new HashSet<string>();
     }
 
     public class Domain : EventSourcedActor<DomainState>, IDomain
     {
-        public Domain(ISnapshotStore snapshotStore, IEventTableStore eventTableStore,ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(snapshotStore,eventTableStore,log, id, runtime, dispatcher)
+        public Domain(ISnapshotStore snapshotStore, IEventTableStore eventTableStore, ILogger<DomainState> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(snapshotStore, eventTableStore, logger, id, runtime, dispatcher)
         {
         }
 

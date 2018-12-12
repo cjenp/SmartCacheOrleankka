@@ -10,10 +10,7 @@ using AzureBlobStorage;
 using Newtonsoft.Json;
 using System.Globalization;
 using Serilog;
-using Serilog.Events;
 using ILogger = Serilog.ILogger;
-using Serilog.Configuration;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 
@@ -50,9 +47,6 @@ namespace SiloHost
                             .WriteTo.Console()
                             .Enrich.FromLogContext()
                             .CreateLogger();
-
-                
-
 
                 var host = await StartSilo(log);
 
@@ -91,8 +85,9 @@ namespace SiloHost
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
-                .ConfigureLogging(logging => logging.AddSeq())
-                .ConfigureServices(d => d.AddSingleton<ILogger>(log))
+                .ConfigureLogging(logging => logging.AddSerilog(log).Services.AddSingleton(log))
+                
+           //     .ConfigureServices(d => d.AddSingleton<ILogger>(log))
 
                 .Configure<SnapshotBlobStoreSettings>(Configuration.GetSection(nameof(SnapshotBlobStoreSettings)))
                 .Configure<EventTableStoreSettings>(
@@ -108,6 +103,8 @@ namespace SiloHost
                 .ConfigureServices(d => d.AddSingleton<EventTableStore>())
                 .ConfigureServices(d => d.AddSingleton<IEventTableStore>(s => s.GetService<EventTableStore>()))
                 .UseInMemoryReminderService()
+                .AddSimpleMessageStreamProvider("SMSProvider")
+                .AddMemoryGrainStorage("PubSubStore")
                 .UseOrleankka();
 
             var host = builder.Build();

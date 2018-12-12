@@ -15,6 +15,11 @@ using ServiceCode;
 using Serilog;
 using Seq;
 using ServiceInterface;
+using Orleans.Hosting;
+using Orleans.ApplicationParts;
+using Orleans.Storage;
+using Orleankka;
+using Orleans.Providers.Streams.SimpleMessageStream;
 
 namespace WebApiO
 {
@@ -42,7 +47,7 @@ namespace WebApiO
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-        public void Configure(IApplicationBuilder app, IHostingEnvironment env)
+        public void Configure(IApplicationBuilder app, Microsoft.AspNetCore.Hosting.IHostingEnvironment env)
         {
             if (env.IsDevelopment())
             {
@@ -74,7 +79,7 @@ namespace WebApiO
                     options.ServiceId = "SmartCache";
                 })
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomain).Assembly).WithReferences())
-                //.ConfigureLogging(logging => logging.)
+                .AddSimpleMessageStreamProvider("SMSProvider")
                 .UseOrleankka()
                 .Build();
 
