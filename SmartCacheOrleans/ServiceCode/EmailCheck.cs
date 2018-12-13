@@ -5,6 +5,8 @@ using CacheGrainInter;
 using System.Net.Mail;
 using Orleankka.Client;
 using Orleankka;
+using CacheGrainImpl;
+using System.Collections.Generic;
 
 namespace ServiceCode
 {
@@ -45,7 +47,7 @@ namespace ServiceCode
             try
             {
                 MailAddress emailAddress = new MailAddress(email);
-                var domain = client.ActorOf<IDomain>(emailAddress.Host);
+                var domain = client.ActorOf<IDomainProjection>($"CacheGrainInter.IDomain:{emailAddress.Host}");
                 return await domain.Ask<bool>(new CheckEmail(email));
             }
             catch (FormatException)
@@ -56,6 +58,12 @@ namespace ServiceCode
             {
                 throw new Exception(e.Message);
             }
+        }
+
+        public async Task<Dictionary<string, int>> GetDomainsInfo()
+        {
+            var domain = client.ActorOf<IBreachedDomains>($"CacheGrainInter.IDomain");
+            return await domain.Ask<Dictionary<string, int>>(new GetDomainsInfo());
         }
     }
 }

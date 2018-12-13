@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\CacheGrainImpl\SmartCache.GrainCode.csproj" />
     <ProjectReference Include="..\ServiceInterface\SmartCache.ServiceInterface.csproj" />
   </ItemGroup>
 

@@ -73,6 +73,8 @@ namespace WebApiO
                     options.ServiceId = "SmartCache";
                 })
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomain).Assembly).WithReferences())
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomainProjection).Assembly).WithReferences())
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IBreachedDomains).Assembly).WithReferences())
                 .AddSimpleMessageStreamProvider("SMSProvider")
                 .UseOrleankka()
                 .Build();
