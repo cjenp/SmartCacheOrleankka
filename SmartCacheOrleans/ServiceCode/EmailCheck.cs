@@ -47,7 +47,7 @@ namespace ServiceCode
             try
             {
                 MailAddress emailAddress = new MailAddress(email);
-                var domain = client.ActorOf<IDomainProjection>($"CacheGrainInter.IDomain:{emailAddress.Host}");
+                var domain = client.ActorOf<IDomainReader>(emailAddress.Host);
                 return await domain.Ask<bool>(new CheckEmail(email));
             }
             catch (FormatException)
@@ -62,8 +62,8 @@ namespace ServiceCode
 
         public async Task<Dictionary<string, int>> GetDomainsInfo()
         {
-            var domain = client.ActorOf<IBreachedDomains>($"CacheGrainInter.IDomain");
-            return await domain.Ask<Dictionary<string, int>>(new GetDomainsInfo());
+            var domain = client.ActorOf<IDomainsInfoReader>("#");
+            return await domain.Ask<Dictionary<String, int>>(new GetDomainsInfo());
         }
     }
 }

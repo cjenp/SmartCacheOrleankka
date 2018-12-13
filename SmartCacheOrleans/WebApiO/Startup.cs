@@ -74,7 +74,9 @@ namespace WebApiO
                 })
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomain).Assembly).WithReferences())
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomainProjection).Assembly).WithReferences())
-                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IBreachedDomains).Assembly).WithReferences())
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomainReader).Assembly).WithReferences())
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomainsInfoProjection).Assembly).WithReferences())
+                .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(IDomainsInfoReader).Assembly).WithReferences())
                 .AddSimpleMessageStreamProvider("SMSProvider")
                 .UseOrleankka()
                 .Build();

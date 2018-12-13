@@ -7,9 +7,15 @@ namespace CacheGrainInter
     public interface IDomain : IActorGrain
     { }
 
-    public interface IBreachedDomains : IActorGrain, IGrainWithGuidCompoundKey
+    public interface IDomainsInfoProjection : IActorGrain, IGrainWithGuidCompoundKey
+    { }
+
+    public interface IDomainsInfoReader : IActorGrain, IGrainWithGuidCompoundKey
     { }
 
     public interface IDomainProjection : IActorGrain, IGrainWithGuidCompoundKey
     { }
+
+    public interface IDomainReader : IActorGrain
+    {}
 }

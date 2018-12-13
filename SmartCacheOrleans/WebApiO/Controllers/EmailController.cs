@@ -20,9 +20,10 @@ namespace WebApiO.Controllers
         //GET: www.example.com/
         [Route("")]
         [HttpGet]
-        public string Info()
+        public async Task<IActionResult> Info()
         {
-            return "WebApi is running. Use GET or POST.";
+            var response = await emailChechker.GetDomainsInfo();
+            return Ok(response);
         }
 
         //GET: www.example.com/{email}

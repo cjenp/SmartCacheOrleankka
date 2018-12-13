@@ -37,12 +37,13 @@ namespace CacheGrainImpl
             snapshotStore = SnapshotStore;
             eventTableStore = EventTableStore;
             this.log = log;
+
         }
 
         public override async Task<object> Receive(object message)
         {
-            if(!loggerScope.ContainsKey("ActorId"))
-                loggerScope.Add("ActorId", Self.Path.Id);
+            if (!loggerScope.ContainsKey("ActorId"))
+                loggerScope.Add("ActorId", Self.Path.Interface);
 
             using (log.BeginScope(loggerScope))
             {
@@ -112,7 +113,7 @@ namespace CacheGrainImpl
 
         async Task<object> HandleCommand(Command cmd)
         {
-            
+
             log.LogInformation("Handling command {@Command}", cmd);
             var events = Dispatcher.DispatchResult<IEnumerable<Event>>(this, cmd).ToArray();
             await eventTableStoreStream.StoreEvents(events);
@@ -162,7 +163,7 @@ namespace CacheGrainImpl
         string fileStoragePath;
         string fileStorageFolder;
 
-        public StreamProjectionActor(IOptions<StreamProjectionSettings> streamProjectionSettings,ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
+        public StreamProjectionActor(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
         {
             this.log = log;
             fileStorageFolder = streamProjectionSettings.Value.FileStoragePath;
@@ -171,14 +172,14 @@ namespace CacheGrainImpl
         public override async Task OnActivateAsync()
         {
             await base.OnActivateAsync();
-            loggerScope.Add("ProjectionActorId",Self.Path.Id);
-            fileStoragePath = $"{fileStorageFolder}\\{Id.Replace(":","_")}.json";
+            loggerScope.Add("ProjectionActorId", Self.Path.Id);
+            fileStoragePath = $"{fileStorageFolder}\\{Id.Replace(":", "_")}.json";
             state = Activator.CreateInstance<T>();
             await ReadFromFile();
             var streamProvider = GetStreamProvider("SMSProvider");
             var stream = streamProvider.GetStream<object>(Guid.Empty, Id);
             await stream.SubscribeAsync(HandleRecivedEvent);
-            
+
         }
 
         public async Task HandleRecivedEvent(object data, StreamSequenceToken token)
@@ -204,18 +205,18 @@ namespace CacheGrainImpl
         {
             if (File.Exists(fileStoragePath))
             {
-                String serializedState=string.Empty;
+                String serializedState = string.Empty;
                 using (StreamReader streamReader = new StreamReader(fileStoragePath))
                 {
                     do
                     {
                         char[] buffer = new char[1000];
-                        int readCount=await streamReader.ReadBlockAsync(buffer);
+                        int readCount = await streamReader.ReadBlockAsync(buffer);
                         serializedState += new string(buffer.Take(readCount).ToArray());
                     } while (!streamReader.EndOfStream);
                     state = JsonConvert.DeserializeObject<T>(serializedState);
                 }
             }
         }
-    }
+    } 
 }

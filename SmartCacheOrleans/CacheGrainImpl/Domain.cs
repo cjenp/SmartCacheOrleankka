@@ -8,6 +8,8 @@ using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans;
 using Microsoft.Extensions.Options;
+using System.Threading.Tasks;
+using System.Net.Mail;
 
 namespace CacheGrainImpl
 {
@@ -46,12 +48,31 @@ namespace CacheGrainImpl
         }
     }
 
+    public class DomainReader : DispatchActorGrain, IDomainReader
+    {
+        async Task<bool> On(CheckEmail e)
+        {
+            MailAddress emailAddress = new MailAddress(e.Email);
+            var domainGrain = System.ActorOf<IDomainProjection>($"CacheGrainInter.IDomain:{emailAddress.Host}");
+            return await domainGrain.Ask(e);
 
+        }
+    }
+
+    public class DomainsInfoReader : DispatchActorGrain, IDomainsInfoReader
+    {
+        async Task<Dictionary<String, int>> On(GetDomainsInfo e)
+        {
+            var domainGrain = System.ActorOf<IDomainsInfoProjection>($"CacheGrainInter.IDomain");
+            return await domainGrain.Ask(e);
+        }
+        
+    }
 
     [ImplicitStreamSubscription("CacheGrainInter.IDomain")]
-    public class BreachedDomains : StreamProjectionActor<DomainsState>, IBreachedDomains
+    public class DomainsInfoProjection : StreamProjectionActor<DomainsState>, IDomainsInfoProjection
     {
-        public BreachedDomains(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger<BreachedDomains> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(streamProjectionSettings, logger, id, runtime, dispatcher)
+        public DomainsInfoProjection(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger<DomainsInfoProjection> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(streamProjectionSettings, logger, id, runtime, dispatcher)
         { }
 
         void On(EventEnvelope<AddedEmailToDomain> e)
