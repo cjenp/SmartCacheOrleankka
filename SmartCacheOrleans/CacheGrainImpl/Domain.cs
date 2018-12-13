@@ -7,6 +7,7 @@ using Orleankka.Meta;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
 using Orleans;
+using Microsoft.Extensions.Options;
 
 namespace CacheGrainImpl
 {
@@ -16,11 +17,15 @@ namespace CacheGrainImpl
         public HashSet<string> Emails = new HashSet<string>();
     }
 
+    public class DomainsState
+    {
+        public Dictionary<string, int> Domains = new Dictionary<string, int>();
+    }
+
     public class Domain : EventSourcedActor<DomainState>, IDomain
     {
-        public Domain(ISnapshotStore snapshotStore, IEventTableStore eventTableStore, ILogger<DomainState> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(snapshotStore, eventTableStore, logger, id, runtime, dispatcher)
-        {
-        }
+        public Domain(ISnapshotStore snapshotStore, IEventTableStore eventTableStore, ILogger<Domain> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(snapshotStore, eventTableStore, logger, id, runtime, dispatcher)
+        { }
 
         void On(AddedEmailToDomain e)
         {
@@ -41,54 +46,44 @@ namespace CacheGrainImpl
         }
     }
 
-    public interface IInventory : IActorGrain, IGrainWithGuidCompoundKey
-    { }
+
 
     [ImplicitStreamSubscription("CacheGrainInter.IDomain")]
-    public class BreachedDomainsList : StreamProjectionActor, IInventory
+    public class BreachedDomains : StreamProjectionActor<DomainsState>, IBreachedDomains
     {
-        readonly Dictionary<string, HashSet<string>> domains =
-             new Dictionary<string, HashSet<string>>();
+        public BreachedDomains(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger<BreachedDomains> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(streamProjectionSettings, logger, id, runtime, dispatcher)
+        { }
 
         void On(EventEnvelope<AddedEmailToDomain> e)
         {
-            if (!domains.ContainsKey(e.StreamId))
+            if (!state.Domains.ContainsKey(e.StreamId))
             {
-                domains.Add(e.StreamId,new HashSet<string>());
+                state.Domains.Add(e.StreamId,0);
             }
-            domains[e.StreamId].Add(e.Event.Email);
+            state.Domains[e.StreamId]++;
         }
 
         Dictionary<String,int> On(GetDomainsInfo e)
         {
-            Dictionary<string, int> domainsInfo = new Dictionary<string, int>();
-            foreach(string key in domains.Keys)
-            {
-                domainsInfo.Add(key, domains[key].Count);
-            }
-            return domainsInfo;
+            return state.Domains;
         }
     }
 
-    public interface IInventoryItemProjection : IActorGrain, IGrainWithGuidCompoundKey
-    { }
-
     [ImplicitStreamSubscription(typeof(StreamFilter))]
-    public class InventoryItemProjection : StreamProjectionActor, IInventoryItemProjection
+    public class DomainProjection : StreamProjectionActor<DomainState>, IDomainProjection
     {
-        HashSet<string> emails=new HashSet<string>();
+        public DomainProjection(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger<DomainProjection> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(streamProjectionSettings, logger, id, runtime, dispatcher)
+        { }
 
-        void On(EventEnvelope<AddedEmailToDomain> e) => emails.Add(e.Event.Email);
-        bool On(CheckEmail e) => emails.Contains(e.Email);
+        void On(EventEnvelope<AddedEmailToDomain> e) => state.Emails.Add(e.Event.Email);
+        bool On(CheckEmail e) => state.Emails.Contains(e.Email);
 
     }
 
     public class StreamFilter : IStreamNamespacePredicate
     {
         public StreamFilter()
-        {
-
-        }
+        { }
         public bool IsMatch(string streamNamespace)
         {
             if (streamNamespace.Contains("CacheGrainInter.IDomain:"))

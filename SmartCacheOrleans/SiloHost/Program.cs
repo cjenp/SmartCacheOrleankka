@@ -13,26 +13,12 @@ using Serilog;
 using ILogger = Serilog.ILogger;
 using Microsoft.Extensions.Configuration;
 using System.IO;
+using CacheGrainImpl;
 
 namespace SiloHost
 {
     public class Program
     {
-        static readonly JsonSerializerSettings SerializerSettings = new JsonSerializerSettings
-        {
-            PreserveReferencesHandling = PreserveReferencesHandling.None,
-            NullValueHandling = NullValueHandling.Ignore,
-            DefaultValueHandling = DefaultValueHandling.Ignore,
-            MissingMemberHandling = MissingMemberHandling.Ignore,
-            ObjectCreationHandling = ObjectCreationHandling.Replace,
-            ConstructorHandling = ConstructorHandling.AllowNonPublicDefaultConstructor,
-            Culture = CultureInfo.InvariantCulture,
-            DateFormatHandling = DateFormatHandling.IsoDateFormat,
-            TypeNameHandling = TypeNameHandling.None,
-            FloatParseHandling = FloatParseHandling.Decimal,
-            Formatting = Formatting.None
-        };
-
         public static int Main(string[] args)
         {
             return RunMainAsync().Result;
@@ -69,13 +55,8 @@ namespace SiloHost
             var configurationBuilder = new ConfigurationBuilder()
             .SetBasePath(Directory.GetCurrentDirectory())
             .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
-            var xs = Directory.GetCurrentDirectory();
             var Configuration = configurationBuilder.Build();
 
-
-            var x = Configuration.GetSection(nameof(SnapshotBlobStoreSettings)).GetChildren();
-            var y = Configuration.GetSection(nameof(EventTableStoreSettings)).GetChildren();
-            // silo config
             var builder = new SiloHostBuilder()
                 .UseLocalhostClustering()
                 .Configure<ClusterOptions>(options =>
@@ -86,6 +67,7 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddSerilog(log).Services.AddSingleton(log))
+                .Configure<StreamProjectionSettings>(Configuration.GetSection(nameof(StreamProjectionSettings)))
                 .Configure<SnapshotBlobStoreSettings>(Configuration.GetSection(nameof(SnapshotBlobStoreSettings)))
                 .Configure<EventTableStoreSettings>(
                     options =>

@@ -8,6 +8,9 @@ using AzureBlobStorage;
 using Microsoft.Extensions.Logging;
 using CacheGrainInter;
 using Orleans.Streams;
+using System.IO;
+using Newtonsoft.Json;
+using Microsoft.Extensions.Options;
 
 namespace CacheGrainImpl
 {
@@ -27,8 +30,9 @@ namespace CacheGrainImpl
         int eventsPerSnapshot = 3;
 
         protected ILogger log;
+        Dictionary<string, object> loggerScope = new Dictionary<string, object>();
 
-        public EventSourcedActor(ISnapshotStore SnapshotStore, IEventTableStore EventTableStore, ILogger<T> log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
+        public EventSourcedActor(ISnapshotStore SnapshotStore, IEventTableStore EventTableStore, ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
         {
             snapshotStore = SnapshotStore;
             eventTableStore = EventTableStore;
@@ -37,15 +41,11 @@ namespace CacheGrainImpl
 
         public override async Task<object> Receive(object message)
         {
+            if(!loggerScope.ContainsKey("ActorId"))
+                loggerScope.Add("ActorId", Self.Path.Id);
 
-            var dic = new Dictionary<string, object>()
+            using (log.BeginScope(loggerScope))
             {
-                ["ActorId"] = Self.Path.Id,
-            };
-
-            using (log.BeginScope(dic))
-            {
-
                 switch (message)
                 {
                     case Activate _:
@@ -154,16 +154,68 @@ namespace CacheGrainImpl
         }
     }
 
-    public abstract class StreamProjectionActor : DispatchActorGrain
+    public abstract class StreamProjectionActor<T> : DispatchActorGrain
     {
+        protected T state;
+        ILogger log;
+        Dictionary<string, object> loggerScope = new Dictionary<string, object>();
+        string fileStoragePath;
+        string fileStorageFolder;
+
+        public StreamProjectionActor(IOptions<StreamProjectionSettings> streamProjectionSettings,ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
+        {
+            this.log = log;
+            fileStorageFolder = streamProjectionSettings.Value.FileStoragePath;
+        }
+
         public override async Task OnActivateAsync()
         {
             await base.OnActivateAsync();
+            loggerScope.Add("ProjectionActorId",Self.Path.Id);
+            fileStoragePath = $"{fileStorageFolder}\\{Id.Replace(":","_")}.json";
+            state = Activator.CreateInstance<T>();
+            await ReadFromFile();
             var streamProvider = GetStreamProvider("SMSProvider");
             var stream = streamProvider.GetStream<object>(Guid.Empty, Id);
-            await stream.SubscribeAsync(async (data, token) =>
-                await Dispatcher.DispatchAsync(this, data)
-            );
+            await stream.SubscribeAsync(HandleRecivedEvent);
+            
+        }
+
+        public async Task HandleRecivedEvent(object data, StreamSequenceToken token)
+        {
+            using (log.BeginScope(loggerScope))
+            {
+                await Dispatcher.DispatchAsync(this, data);
+                log.LogInformation("Projection recived event:{eventData}", data);
+                SaveToFile();
+            }
+        }
+
+        public void SaveToFile()
+        {
+            using (StreamWriter streamWriter = new StreamWriter(fileStoragePath))
+            {
+                JsonSerializer jsonSerializer = new JsonSerializer();
+                jsonSerializer.Serialize(streamWriter, state);
+            }
+        }
+
+        public async Task ReadFromFile()
+        {
+            if (File.Exists(fileStoragePath))
+            {
+                String serializedState=string.Empty;
+                using (StreamReader streamReader = new StreamReader(fileStoragePath))
+                {
+                    do
+                    {
+                        char[] buffer = new char[1000];
+                        int readCount=await streamReader.ReadBlockAsync(buffer);
+                        serializedState += new string(buffer.Take(readCount).ToArray());
+                    } while (!streamReader.EndOfStream);
+                    state = JsonConvert.DeserializeObject<T>(serializedState);
+                }
+            }
         }
     }
 }
