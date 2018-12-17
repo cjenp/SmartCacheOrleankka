@@ -17,6 +17,18 @@ namespace CacheGrainInter
     }
 
     [Serializable]
+    public class GetEventsLog : Command
+    {
+        public readonly int Version;
+
+        public GetEventsLog(int version)
+        {
+            Version = version;
+        }
+    }
+    
+
+    [Serializable]
     public class CheckEmail : Query<bool>
     {
         public readonly string Email;
@@ -42,17 +54,32 @@ namespace CacheGrainInter
         }
     }
 
-    [Serializable]
-    public class EventEnvelope<T> where T : Event
+    public interface IEventEnvelope
     {
-        public readonly string StreamId;
-        public readonly T Event;
+        string StreamId { get; set; }
+        int EventVersion { get; set; }
 
-        public EventEnvelope(string stream, T @event)
+    }
+    public interface IEventEnvelope<T>: IEventEnvelope where T : Event
+    {
+        T Event { get; set; }
+
+    }
+    [Serializable]
+    public class EventEnvelope<T>: IEventEnvelope<T> where T : Event
+    {
+
+        public EventEnvelope(string stream, T @event, int eventVersion)
         {
             StreamId = stream;
             Event = @event;
+            EventVersion = eventVersion;
         }
+
+     public   string StreamId { get; set; }
+        public int EventVersion { get; set; }
+        public T Event { get; set; }
+
     }
 
     [Serializable]
@@ -65,6 +92,19 @@ namespace CacheGrainInter
         {
             SnapshotUri = snapshotUri;
             EventsInSNapshot = eventsInSNapshot;
+        }
+    }
+
+    [Serializable]
+    public class ProjectionStoreEntity<T>
+    {
+        public int Version;
+        public T State;
+
+        public ProjectionStoreEntity(int version, T state)
+        {
+            Version = version;
+            State = state;
         }
     }
 

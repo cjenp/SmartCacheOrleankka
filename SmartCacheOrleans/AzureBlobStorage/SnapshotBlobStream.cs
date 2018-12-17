@@ -1,8 +1,6 @@
 ﻿using CacheGrainInter;
 using Microsoft.WindowsAzure.Storage.Blob;
 using Newtonsoft.Json;
-using Serilog;
-using Serilog.Context;
 using System;
 using System.IO;
 using System.Net;
@@ -13,10 +11,18 @@ namespace AzureBlobStorage
 {
     public interface ISnapshotStore
     {
-        Task<SnapshotBlobStream> ProvisonSnapshotStream(string IdActor);
+        Task<ISnapshotBlobStream> ProvisonSnapshotStream(string IdActor);
     }
 
-    public class SnapshotBlobStream
+    public interface ISnapshotBlobStream
+    {
+        Task WriteSnapshot(Object snapshot, int eventCount);
+        int Version();
+        Task<SnapshotData> ReadSnapshot(int ver = 0);
+        T ReadSnapshotFromUri<T>(String uri);
+    }
+
+    public class SnapshotBlobStream: ISnapshotBlobStream
     {
         private CloudBlobContainer blobContainer;
         private JsonSerializerSettings jSSettings;

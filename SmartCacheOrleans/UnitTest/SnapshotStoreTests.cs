@@ -82,14 +82,15 @@ namespace UnitTests
             String streamName = "teststream";
             Partition partition = new Partition(cloudTable, streamName);
             Stream stream = new Stream(partition);
-            //var events = new Event[] { new DomainAddedEmail("3@domena1.com"), new DomainAddedEmail("2@domena1.com") , new DomainAddedEmail("1@domena1.com") };
             EventTableStoreStream eventTableStoreStream = new EventTableStoreStream(partition,stream,"teststream",SerializerSettings);
 
             await eventTableStoreStream.StoreEvents(events);
-            //var eventsReturned=await eventTableStoreStream.ReadEvents(0);
-            int ver = eventTableStoreStream.Version;
+            var eventsReturned=await eventTableStoreStream.ReadEvents(x =>
+            {
 
-            //eventsReturned.Should().BeEquivalentTo(events);
+
+            },0);
+            int ver = eventTableStoreStream.Version;
             ver.Should().Be(events.Length);
 
         }

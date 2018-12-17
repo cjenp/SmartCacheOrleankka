@@ -12,7 +12,7 @@ namespace AzureBlobStorage
 {
     public interface IEventTableStore
     {
-        Task<EventTableStoreStream> ProvisonEventStream(string IdActor);
+        Task<IEventTableStoreStream> ProvisonEventStream(string IdActor);
     }
 
     public class EventTableStore : IEventTableStore
@@ -46,7 +46,7 @@ namespace AzureBlobStorage
                 jsonSerializerSettings = JsonSerializerSettings;
         }
         
-        public async Task<EventTableStoreStream> ProvisonEventStream(string actorId)
+        public async Task<IEventTableStoreStream> ProvisonEventStream(string actorId)
         {
             await cloudTable.CreateIfNotExistsAsync();
             Partition partition=new Partition(cloudTable, actorId);

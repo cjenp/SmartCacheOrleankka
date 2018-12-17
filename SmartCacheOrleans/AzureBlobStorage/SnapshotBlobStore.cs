@@ -55,7 +55,7 @@ namespace AzureBlobStorage
                 jsonSerializerSettings = JsonSerializerSettings;
         }
 
-        public async Task<SnapshotBlobStream> ProvisonSnapshotStream(string actorId)
+        public async Task<ISnapshotBlobStream> ProvisonSnapshotStream(string actorId)
         {
             await cloudTable.CreateIfNotExistsAsync();
             blobContainer = blobClient.GetContainerReference(containerName);
@@ -64,6 +64,7 @@ namespace AzureBlobStorage
 
             Partition partition = new Partition(cloudTable, actorId);
             Stream stream = new Stream(partition);
+
             return new SnapshotBlobStream(actorId, blobContainer, SerializerSettings, new EventTableStoreStream(partition,stream, actorId, jsonSerializerSettings));
         }
     }

@@ -35,10 +35,6 @@ namespace ServiceCode
             {
                 throw new FormatException(String.Format("Invalid email format: '{0}'.",email));
             }
-            catch (Exception e)
-            {
-                throw new Exception(e.Message);
-            }
             return true;
         }
 

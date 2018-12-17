@@ -1,16 +1,14 @@
-﻿using Orleankka;
+﻿using AzureBlobStorage;
+using CacheGrainInter;
+using FileStorageProviderNS;
+using Microsoft.Extensions.Logging;
+using Orleankka;
 using Orleankka.Meta;
+using Orleans.Streams;
 using System;
 using System.Collections.Generic;
-using System.Threading.Tasks;
 using System.Linq;
-using AzureBlobStorage;
-using Microsoft.Extensions.Logging;
-using CacheGrainInter;
-using Orleans.Streams;
-using System.IO;
-using Newtonsoft.Json;
-using Microsoft.Extensions.Options;
+using System.Threading.Tasks;
 
 namespace CacheGrainImpl
 {
@@ -18,10 +16,10 @@ namespace CacheGrainImpl
     {
         protected T state;
         ISnapshotStore snapshotStore;
-        SnapshotBlobStream snapshotBlobStream;
+        ISnapshotBlobStream snapshotBlobStream;
 
         IEventTableStore eventTableStore;
-        EventTableStoreStream eventTableStoreStream;
+        IEventTableStoreStream eventTableStoreStream;
 
         StreamRef streamProjectionAggregate;
         StreamRef streamProjectionDomain;
@@ -37,19 +35,17 @@ namespace CacheGrainImpl
             snapshotStore = SnapshotStore;
             eventTableStore = EventTableStore;
             this.log = log;
-
+            state = Activator.CreateInstance<T>();
         }
 
         public override async Task<object> Receive(object message)
         {
-            if (!loggerScope.ContainsKey("ActorId"))
-                loggerScope.Add("ActorId", Self.Path.Interface);
-
             using (log.BeginScope(loggerScope))
             {
                 switch (message)
                 {
                     case Activate _:
+                        loggerScope.Add("ActorId", Self.Path.Interface);
                         await CreateStorageAndProjectionStreams();
                         await LoadSnapshot();
                         await Load();
@@ -71,7 +67,7 @@ namespace CacheGrainImpl
             }
         }
 
-        public async Task CreateStorageAndProjectionStreams()
+        private async Task CreateStorageAndProjectionStreams()
         {
             streamProjectionAggregate = System.StreamOf("SMSProvider", $"{Self.Path.Interface}");
             streamProjectionDomain = System.StreamOf("SMSProvider", $"{Self.Path}");
@@ -80,7 +76,7 @@ namespace CacheGrainImpl
             eventTableStoreStream = await eventTableStore.ProvisonEventStream(StreamName());
         }
 
-        public async Task LoadSnapshot()
+        private async Task LoadSnapshot()
         {
             if (snapshotBlobStream.Version() > 0)
             {
@@ -92,26 +88,26 @@ namespace CacheGrainImpl
                 state = Activator.CreateInstance<T>();
         }
 
-        async Task Load()
+        private async Task Load()
         {
             var eventsRead = await eventTableStoreStream.ReadEvents(Apply, version);
             version += eventsRead;
             log.LogInformation("Read {NumberOfEvents} events", eventsRead);
         }
 
-        void Apply(IEnumerable<Event> events)
+        private void Apply(IEnumerable<Event> events)
         {
             foreach (var @event in events)
                 Dispatcher.Dispatch(this, @event);
         }
 
-        Task<object> HandleQuery(Query query)
+        private Task<object> HandleQuery(Query query)
         {
             log.LogInformation("Handling query {@Query}", query);
             return Result(Dispatcher.DispatchResult(this, query));
         }
 
-        async Task<object> HandleCommand(Command cmd)
+        private async Task<object> HandleCommand(Command cmd)
         {
 
             log.LogInformation("Handling command {@Command}", cmd);
@@ -119,104 +115,148 @@ namespace CacheGrainImpl
             await eventTableStoreStream.StoreEvents(events);
 
             Apply(events);
-            version += events.Count();
-            if (version % eventsPerSnapshot > 0)
+            foreach(Event @event in events)
             {
-                await snapshotBlobStream.WriteSnapshot(state, version);
+                version++;
+                await Project(@event);
+                if (version % eventsPerSnapshot == 0)
+                {
+                    await snapshotBlobStream.WriteSnapshot(state, version);
+                }
             }
-            await Project(events);
             return events;
         }
 
-        async Task Project(IEnumerable<Event> events)
+        private async Task Project(Event @event)
         {
-            foreach (var @event in events)
-            {
-                var envelope = Wrap(@event);
-                await streamProjectionAggregate.Push(envelope);
-                await streamProjectionDomain.Push(envelope);
-            }
+            var envelope = Wrap(@event);
+            await streamProjectionAggregate.Push(envelope);
+            await streamProjectionDomain.Push(envelope);
         }
 
-        object Wrap(Event @event)
+        private object Wrap(Event @event)
         {
             var envelopeType = typeof(EventEnvelope<>).MakeGenericType(@event.GetType());
-            return Activator.CreateInstance(envelopeType, Id, @event);
+            return Activator.CreateInstance(envelopeType, Id, @event, version);
         }
 
-        string StreamName()
+        private string StreamName()
         {
-            return GetType().Name + "-" + Id;
+            return Self.Path;
         }
 
-        string SnapshotStreamName()
+        private string SnapshotStreamName()
         {
             return GetType().Name + "-" + Id + "-" + "Snapshot";
         }
     }
 
+    public abstract class StreamProjectionAggregateActor<T> : StreamProjectionActor<T>
+    {
+        Dictionary<string, int> versions = new Dictionary<string, int>();
+
+        public StreamProjectionAggregateActor(IFileStorageProvider fileStorageProvider, IEventTableStore eventTableStore, ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(fileStorageProvider, eventTableStore, log, id, runtime, dispatcher)
+        { }
+
+        /*
+        public override async Task HandleRecivedEvent(object data, StreamSequenceToken token)
+        {
+            String streamId = (data as dynamic).StreamId;
+            int idVersion;
+            if(!versions.TryGetValue(streamId, out idVersion))
+            {
+                versions.Add(streamId, 0);
+            }
+
+            if ((data as dynamic).EventVersion == (idVersion + 1))
+            {
+                await Dispatcher.DispatchAsync(this, data);
+                versions[streamId]++;
+            }
+            else
+            {
+                EventTableStoreStream eventTableStoreStream = await eventTableStore.ProvisonEventStream(Id);
+                var tablePartitions = eventTableStoreStream.GetAllTablePartitions();
+                foreach (string partitionName in tablePartitions)
+                {
+                    await RefreshFromEventStorage(partitionName);
+                }
+            }
+            SaveToFile();
+        }
+
+        public async Task RefreshFromEventStorage(String streamId)
+        {
+            EventTableStoreStream eventTableStoreStream = await eventTableStore.ProvisonEventStream(streamId);
+            if (!versions.ContainsKey(streamId))
+            {
+                versions.Add(streamId, 0);
+            }
+            versions[streamId] = +await eventTableStoreStream.ReadEvents(Apply, versions[streamId]);
+        }*/
+    }
+
     public abstract class StreamProjectionActor<T> : DispatchActorGrain
     {
         protected T state;
+        int version=0;
         ILogger log;
-        Dictionary<string, object> loggerScope = new Dictionary<string, object>();
-        string fileStoragePath;
-        string fileStorageFolder;
+        Dictionary<string, object> ActorId = new Dictionary<string, object>();
+        protected IEventTableStore eventTableStore;
+        protected IFileStorageProvider fileStorageProvider;
+        private IEventTableStoreStream eventTableStoreStream;
 
-        public StreamProjectionActor(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
+        public StreamProjectionActor(IFileStorageProvider fileStorageProvider, IEventTableStore eventTableStore , ILogger log, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(id, runtime, dispatcher)
         {
+            this.eventTableStore = eventTableStore;
             this.log = log;
-            fileStorageFolder = streamProjectionSettings.Value.FileStoragePath;
+            this.fileStorageProvider = fileStorageProvider;
         }
 
         public override async Task OnActivateAsync()
         {
             await base.OnActivateAsync();
-            loggerScope.Add("ProjectionActorId", Self.Path.Id);
-            fileStoragePath = $"{fileStorageFolder}\\{Id.Replace(":", "_")}.json";
+
+            eventTableStoreStream = await eventTableStore.ProvisonEventStream(Id);
+            ActorId.TryAdd("ProjectionActorId", Self.Path.Id);
             state = Activator.CreateInstance<T>();
-            await ReadFromFile();
+
+            var savedData=await fileStorageProvider.ReadFromFile<T>(Id);
+            if (savedData != null)
+            {
+                state = savedData.State;
+                version = savedData.Version;
+            }
+
             var streamProvider = GetStreamProvider("SMSProvider");
-            var stream = streamProvider.GetStream<object>(Guid.Empty, Id);
+            var stream = streamProvider.GetStream<IEventEnvelope>(Guid.Empty, Id);
             await stream.SubscribeAsync(HandleRecivedEvent);
 
         }
 
-        public async Task HandleRecivedEvent(object data, StreamSequenceToken token)
+        public virtual async Task HandleRecivedEvent(IEventEnvelope data, StreamSequenceToken token)
         {
-            using (log.BeginScope(loggerScope))
+            using (log.BeginScope(ActorId))
             {
-                await Dispatcher.DispatchAsync(this, data);
-                log.LogInformation("Projection recived event:{eventData}", data);
-                SaveToFile();
-            }
-        }
-
-        public void SaveToFile()
-        {
-            using (StreamWriter streamWriter = new StreamWriter(fileStoragePath))
-            {
-                JsonSerializer jsonSerializer = new JsonSerializer();
-                jsonSerializer.Serialize(streamWriter, state);
-            }
-        }
-
-        public async Task ReadFromFile()
-        {
-            if (File.Exists(fileStoragePath))
-            {
-                String serializedState = string.Empty;
-                using (StreamReader streamReader = new StreamReader(fileStoragePath))
+                if (data.EventVersion == (version+1))
                 {
-                    do
-                    {
-                        char[] buffer = new char[1000];
-                        int readCount = await streamReader.ReadBlockAsync(buffer);
-                        serializedState += new string(buffer.Take(readCount).ToArray());
-                    } while (!streamReader.EndOfStream);
-                    state = JsonConvert.DeserializeObject<T>(serializedState);
+                    await Dispatcher.DispatchAsync(this, data);
+                    log.LogInformation("Projection recived event:{eventData}", data);
+                    version++;
                 }
+                else
+                {
+                    version = +await eventTableStoreStream.ReadEvents(Apply, version);
+                }
+
+                fileStorageProvider.SaveToFile<T>(new ProjectionStoreEntity<T>(version,state),Id);
             }
+        }
+        
+        protected void Apply(IEnumerable<Event> events)
+        {
+            foreach (var @event in events)
+                Dispatcher.Dispatch(this, @event);
         }
     } 
 }

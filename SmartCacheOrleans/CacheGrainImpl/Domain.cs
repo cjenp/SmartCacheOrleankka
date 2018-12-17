@@ -10,6 +10,7 @@ using Orleans;
 using Microsoft.Extensions.Options;
 using System.Threading.Tasks;
 using System.Net.Mail;
+using FileStorageProviderNS;
 
 namespace CacheGrainImpl
 {
@@ -55,7 +56,6 @@ namespace CacheGrainImpl
             MailAddress emailAddress = new MailAddress(e.Email);
             var domainGrain = System.ActorOf<IDomainProjection>($"CacheGrainInter.IDomain:{emailAddress.Host}");
             return await domainGrain.Ask(e);
-
         }
     }
 
@@ -72,8 +72,18 @@ namespace CacheGrainImpl
     [ImplicitStreamSubscription("CacheGrainInter.IDomain")]
     public class DomainsInfoProjection : StreamProjectionActor<DomainsState>, IDomainsInfoProjection
     {
-        public DomainsInfoProjection(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger<DomainsInfoProjection> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(streamProjectionSettings, logger, id, runtime, dispatcher)
+        public DomainsInfoProjection(IFileStorageProvider fileStorageProvider ,IEventTableStore eventTableStore, ILogger<DomainsInfoProjection> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(fileStorageProvider, eventTableStore, logger, id, runtime, dispatcher)
         { }
+
+        void On(AddedEmailToDomain e)
+        {
+            MailAddress mailAddress = new MailAddress(e.Email);
+            if (!state.Domains.ContainsKey(mailAddress.Host))
+            {
+                state.Domains.Add(mailAddress.Host, 0);
+            }
+            state.Domains[mailAddress.Host]++;
+        }
 
         void On(EventEnvelope<AddedEmailToDomain> e)
         {
@@ -93,9 +103,10 @@ namespace CacheGrainImpl
     [ImplicitStreamSubscription(typeof(StreamFilter))]
     public class DomainProjection : StreamProjectionActor<DomainState>, IDomainProjection
     {
-        public DomainProjection(IOptions<StreamProjectionSettings> streamProjectionSettings, ILogger<DomainProjection> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(streamProjectionSettings, logger, id, runtime, dispatcher)
+        public DomainProjection(IFileStorageProvider fileStorageProvider, IEventTableStore eventTableStore, ILogger<DomainProjection> logger, string id = null, IActorRuntime runtime = null, Dispatcher dispatcher = null) : base(fileStorageProvider, eventTableStore, logger, id, runtime, dispatcher)
         { }
 
+        void On(AddedEmailToDomain e) => state.Emails.Add(e.Email);
         void On(EventEnvelope<AddedEmailToDomain> e) => state.Emails.Add(e.Event.Email);
         bool On(CheckEmail e) => state.Emails.Contains(e.Email);
 

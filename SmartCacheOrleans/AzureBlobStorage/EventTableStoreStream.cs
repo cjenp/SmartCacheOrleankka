@@ -1,4 +1,5 @@
 ﻿using CacheGrainInter;
+using Microsoft.WindowsAzure.Storage.Table;
 using Newtonsoft.Json;
 using Orleankka.Meta;
 using Serilog;
@@ -10,7 +11,15 @@ using System.Threading.Tasks;
 
 namespace AzureBlobStorage
 {
-    public class EventTableStoreStream
+    public interface IEventTableStoreStream
+    {
+        Task StoreEvents(Event[] events);
+        Task StoreSnapshot(String uri, int eventCount);
+        Task<int> ReadEvents(Action<IEnumerable<Event>> func, int lastReadVersion);
+        Task<SnapshotData> ReadSnapshot(int snapshotVersion = 0);
+    }
+
+    public class EventTableStoreStream: IEventTableStoreStream
     {
         JsonSerializerSettings serializerSettings;
         Partition partition;
@@ -31,6 +40,24 @@ namespace AzureBlobStorage
                 ? existent.Stream : new Stream(partition);
             version = stream.Version;
         }
+
+        /*
+        public IEnumerable<String> GetAllTablePartitions()
+        {
+            var query = new TableQuery<DynamicTableEntity>().Select(new string[] { "PartitionKey" });
+            var partitionKeys = new List<String>();
+            TableContinuationToken token = null;
+
+            do
+            {
+                var segment = partition.Table.ExecuteQuerySegmentedAsync(query, token).Result;
+                token = segment.ContinuationToken;
+
+                partitionKeys.AddRange(segment.Select(item => item.PartitionKey));
+            }
+            while (token != null);
+            return partitionKeys.Distinct();
+        }*/
 
         private int version;
         public int Version

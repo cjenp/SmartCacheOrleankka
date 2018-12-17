@@ -14,6 +14,7 @@ using ILogger = Serilog.ILogger;
 using Microsoft.Extensions.Configuration;
 using System.IO;
 using CacheGrainImpl;
+using FileStorageProviderNS;
 
 namespace SiloHost
 {
@@ -67,15 +68,11 @@ namespace SiloHost
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
                 .ConfigureApplicationParts(parts => parts.AddApplicationPart(typeof(CacheGrainImpl.Domain).Assembly).WithReferences())
                 .ConfigureLogging(logging => logging.AddSerilog(log).Services.AddSingleton(log))
-                .Configure<StreamProjectionSettings>(Configuration.GetSection(nameof(StreamProjectionSettings)))
+                .Configure<FileStorageProviderSettings>(Configuration.GetSection(nameof(FileStorageProviderSettings)))
                 .Configure<SnapshotBlobStoreSettings>(Configuration.GetSection(nameof(SnapshotBlobStoreSettings)))
-                .Configure<EventTableStoreSettings>(
-                    options =>
-                    {
-                        options.AzureConnectionString = "UseDevelopmentStorage=true";
-                        options.TableName = "tableName";
-                    }
-                )
+                .Configure<EventTableStoreSettings>(Configuration.GetSection(nameof(EventTableStoreSettings)))
+                .ConfigureServices(d => d.AddSingleton<FileStorageProvider>())
+                .ConfigureServices(d => d.AddSingleton<IFileStorageProvider>(s => s.GetService<FileStorageProvider>()))
                 .ConfigureServices(d => d.AddSingleton<SnapshotBlobStore>())
                 .ConfigureServices(d => d.AddSingleton<ISnapshotStore>(s=>s.GetService<SnapshotBlobStore>()))
                 .ConfigureServices(d => d.AddSingleton<EventTableStore>())
